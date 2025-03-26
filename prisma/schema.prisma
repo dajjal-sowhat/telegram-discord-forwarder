@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Bot {
+  id                 String                     @id
+  token              String                     @unique
+  name               String
+  type               BotType
+  created_at         DateTime                   @default(now())
+  channels           ForwardChannel[]
+  Plan               Plan[]
+  actions            ForwardAction[]
+  actionDestinations ForwardActionDestination[]
+}
+
+enum BotType {
+  TELEGRAM
+  DISCORD
+  SELF_DISCORD
+}
+
+model ForwardChannel {
+  channelId    String
+  type         BotType
+  name         String
+  created_at   DateTime                   @default(now())
+  actions      ForwardAction[]
+  destinations ForwardActionDestination[]
+
+  botId String
+  bot   Bot    @relation(fields: [botId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([channelId, botId], name: "id")
+}
+
+model ForwardAction {
+  id           Int                        @id @default(autoincrement())
+  created_at   DateTime                   @default(now())
+  source       ForwardChannel             @relation(fields: [sourceId, botId], references: [channelId, botId], onDelete: Cascade, onUpdate: Cascade)
+  sourceId     String
+  botId        String
+  bot          Bot                        @relation(fields: [botId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  destinations ForwardActionDestination[]
+
+  @@unique([sourceId, botId], name: "uniq")
+}
+
+model ForwardActionDestination {
+  action        ForwardAction  @relation(fields: [actionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actionId      Int
+  destination   ForwardChannel @relation(fields: [destinationId, botId], references: [channelId, botId], onDelete: Cascade, onUpdate: Cascade)
+  botId         String
+  bot           Bot            @relation(fields: [botId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  destinationId String
+  results       ActionResult[]
+
+  @@unique(name: "id", [actionId, destinationId])
+}
+
+model ActionResult {
+  actionDestination ForwardActionDestination @relation(fields: [actionId, destinationId], references: [actionId, destinationId], onUpdate: Cascade, onDelete: Cascade)
+  actionId          Int
+  destinationId     String
+
+  sourceTrackId      String
+  destinationTrackId String   @unique
+  created_at         DateTime @default(now())
+
+  @@unique(name: "id", [sourceTrackId, destinationTrackId])
+}
+
+model Config {
+  key   String @id
+  value String
+}
+
+model CloneTask {
+  id         String           @id @default(uuid())
+  created_at DateTime         @default(now())
+  filters    String[]         @default([])
+  channels   String[]         @default([])
+  status     TaskStatus       @default(PREPARE)
+  params     Json
+  tracks     CloneTaskTrack[]
+}
+
+enum TaskStatus {
+  PREPARE
+  RUNNING
+  STOPPED
+  ERROR
+  FINISHED
+}
+
+model CloneTaskTrack {
+  id         Int       @id @default(autoincrement())
+  cloned_id  String
+  source_id  String
+  taskId     String
+  task       CloneTask @relation(fields: [taskId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  created_at DateTime  @default(now())
+}
+
+model Plan {
+  id       String    @id @default(uuid())
+  name     String
+  role     String
+  guild    String
+  botId    String
+  price    Int
+  days     Int       @default(30)
+  bot      Bot       @relation(fields: [botId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  payments Payment[]
+}
+
+model Payment {
+  id         String        @id @default(uuid())
+  planId     String
+  plan       Plan          @relation(fields: [planId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  userName   String
+  userId     String
+  token      String        @unique
+  status     PaymentStatus @default(NOT_PAID)
+  created_at DateTime      @default(now())
+  paid_at    DateTime?
+
+  @@unique([planId, userId], name: "uniqueId")
+}
+
+enum PaymentStatus {
+  PAID
+  NOT_PAID
+}
