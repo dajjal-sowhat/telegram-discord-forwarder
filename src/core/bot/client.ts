@@ -113,6 +113,7 @@ export async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
 			}
 		}))
 			.catch(async (e) => {
+				console.error(e);
 				INITIALIZE_CLIENTS_LOADING[key] = false;
 				return await getDiscordBot(bot, _try + 1);
 			}).finally(() => {
