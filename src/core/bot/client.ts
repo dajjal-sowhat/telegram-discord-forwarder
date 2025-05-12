@@ -98,7 +98,7 @@ export async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
 		await new Promise(((resolve, reject) => {
 			const t = setTimeout(() => {
 				reject(`${client.bot.key} Waiting Timeout!`);
-			}, 30000);
+			}, 120000);
 			if (isDiscordClient(client)) {
 				client.login(bot.token).then(() => {
 					clearTimeout(t);
