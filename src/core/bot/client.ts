@@ -1,11 +1,12 @@
 import {Bot} from ".prisma/client";
 import {BotType} from "@prisma/client";
-import Discord, {Client, ClientOptions} from "discord.js";
+import Discord, {Client, ClientOptions, ResponseLike} from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
 import {Telegraf} from "telegraf";
 import {handleClientEvent} from "./events";
 import {PrismaModelType} from "@/prisma/PrismaClient";
 import {clearTimeout} from "node:timers";
+import {singleFlightFunc} from "@/prisma/utils";
 
 declare global {
 	var INITIALIZED_CLIENTS: {
@@ -179,6 +180,11 @@ export function isDiscordClient(client: unknown): client is Discord.Client {
 	return !!client && typeof client === 'object' && 'isReady' in client && 'destroy' in client;
 }
 
+export const synchronizedFetch = singleFlightFunc(async function(...args: Parameters<typeof fetch>) {
+	const [url, init] = args;
+	console.log(init?.method || "GET",url?.toString?.().slice(-10)+"...")
+	return fetch(...args);
+},300);
 
 export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): ClientOptions {
 	const intents: ClientOptions['intents'] = ['MessageContent', 'GuildMessages', "Guilds", "GuildMembers"] as const;
@@ -195,7 +201,14 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
 		presence: {
 			status: "online"
 		},
-		shards: 'auto'
+		shards: 'auto',
+		rest: {
+			...needs?.rest || {},
+			makeRequest(url, init) {
+				return synchronizedFetch(url,init as any) as any;
+			},
+
+		}
 	}
 }
 

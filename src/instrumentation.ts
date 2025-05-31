@@ -1,4 +1,4 @@
-import {Application, ChannelType, ClientApplication} from "discord.js";
+import {Application, ChannelType, Client, ClientApplication} from "discord.js";
 import * as Prisma from "./prisma/PrismaClient";
 import {getDiscordBot, InitializeBots, terminateClient} from "./core/bot/client";
 
