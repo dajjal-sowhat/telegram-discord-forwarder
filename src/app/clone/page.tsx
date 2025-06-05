@@ -27,9 +27,10 @@ async function Page(props: any) {
 					head: ['From', "To", "Action Complete","End at", "Status","Action"],
 					body: await Promise.all(tasks.map(async task => {
 						const [source,destination] = await Promise.all([
-							task.sourceGuild(),
-							task.destinationGuild()
+							task.sourceGuild().catch(()=>undefined),
+							task.destinationGuild().catch(()=>undefined)
 						]);
+						if (!source || !destination) return [];
 						const handler = getCloneHandler(task);
 						task.status = handler?.task?.status || "STOPPED";
 						task = ssr(task);

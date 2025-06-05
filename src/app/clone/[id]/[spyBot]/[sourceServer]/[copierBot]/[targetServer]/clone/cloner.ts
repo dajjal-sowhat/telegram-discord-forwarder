@@ -4,6 +4,7 @@ import {getBot, getDiscordBot, isDiscordClient} from "@/core/bot/client";
 import {CloneTask, Prisma} from "@prisma/client";
 import {PrismaModelType} from "@/prisma/PrismaClient";
 import {ChannelType, GuildChannel, TextChannel} from "discord.js";
+import {sleep} from "@/prisma/utils";
 
 declare global {
 	var tasks: {
@@ -30,10 +31,16 @@ export class CloneTaskHandler {
 	totalActions = 0;
 	logFunction: ((str: string, percent: number) => any) | undefined = undefined;
 	calcTotalAction = false;
+	private _paused = false;
 	actionSleep = 1500;
 	tracks: {
 		[k: string]: string
 	} = {}
+
+	set pause(o: boolean) {
+		this.log = `Task ${o ? "Paused":"Resumed"}...`;
+		this._paused = o;
+	}
 
 	constructor(task: typeof this.task) {
 		this.task = task;
@@ -61,6 +68,13 @@ export class CloneTaskHandler {
 		return `${min}min ${Math.ceil(secs - (min * 60))}sec`
 	}
 
+	async waitForResume() {
+		do {
+			this.log = "Task is paused"
+			await sleep(5000);
+		} while(this._paused)
+	}
+
 	async doAction<T extends object | string>(actionName: string, array: T[], each: (o: T, i: number) => any, duplicate?: (o: T) => boolean) {
 		if (this.calcTotalAction) {
 			this.totalActions += array.length;
@@ -70,6 +84,7 @@ export class CloneTaskHandler {
 		let n = 0;
 		for (let item of array) {
 			if (this.task.status !== 'RUNNING') this.error("Task is not running");
+			if (this._paused) await this.waitForResume();
 			n++;
 			try {
 				this.log = (`${actionName}(${n}/${array.length})...`)
@@ -336,7 +351,6 @@ export class CloneTaskHandler {
 			}
 		})
 		this.status = "FINISHED";
-
 	}
 }
 

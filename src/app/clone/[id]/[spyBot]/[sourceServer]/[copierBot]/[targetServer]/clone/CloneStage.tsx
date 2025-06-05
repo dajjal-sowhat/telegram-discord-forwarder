@@ -2,21 +2,32 @@
 
 import {ClonerContext} from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/clone/context";
 import {useContext, useEffect, useMemo, useRef, useState} from "react";
-import {Button, Code, Progress} from "@mantine/core";
-import {handleClone} from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/clone/action";
-import {ClonerParams} from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/clone/cloner";
+import {Button, Code, Progress, Select} from "@mantine/core";
+import {
+	changeClonePause,
+	changeCloneStatus,
+	handleClone
+} from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/clone/action";
+import {
+	ClonerParams
+} from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/clone/cloner";
 import {PrismaModelType} from "@/prisma/PrismaClient";
+import {TaskStatus} from "@prisma/client";
+import {useRouter} from "next/navigation";
+
 
 function CloneStage(props: {
 	params: typeof ClonerParams,
 	filters: string[],
 	task?: PrismaModelType<'cloneTask'>
 }) {
+	const task = props?.task
 	const context = useContext(ClonerContext);
 	const [verified, setVerified] = useState(props?.task?.status === "RUNNING");
 	const init = useRef(false);
 	const [logs, setLogs] = useState<string[]>([]);
 	const [percent, setPercent] = useState(0);
+	const router = useRouter();
 
 	const handle = async () => {
 		const res = await handleClone(props.task || props.params, {
@@ -25,13 +36,11 @@ function CloneStage(props: {
 		}).catch(()=>undefined);
 		if (!res) throw("Invalid response");
 
-		const decoder = new TextDecoder();
 		const reader = res.getReader();
 		do {
-			const {value, done} = await reader.read();
+			let {value: content, done} = await reader.read();
 
-			if (!!value) {
-				const content = decoder.decode(value as any);
+			if (!!content) {
 				for (let string of content.split("__BR__")) {
 					if (!string.trim()) continue;
 					try {
@@ -45,7 +54,10 @@ function CloneStage(props: {
 				}
 			}
 
-			if (done) break;
+			if (done) {
+				router.push("./");
+				break;
+			}
 		} while (true);
 	}
 
@@ -77,8 +89,37 @@ function CloneStage(props: {
 	return (
 		<div>
 			<div className="flex gap-2 items-center">
-				<p>Cloning {Math.round(percent)}%</p>
-				<Progress value={percent} className={'flex-grow'}/>
+				<div className={'flex flex-col gap-2 flex-grow'}>
+					<p>Cloning {Math.round(percent)}%</p>
+					<Progress value={percent} className={'flex-grow'}/>
+				</div>
+				{task && (
+					<Select label={'Change Status'} defaultValue={task.status} data={[
+						"Pause",
+						"Resume",
+						"Stop",
+						"Start"
+					]} onChange={async(e)=>{
+						if (!e) return;
+
+						if (e === "Start") {
+							changeCloneStatus(task,"RUNNING")
+								.finally(()=>{
+									router.refresh();
+								})
+						} else if (e === "Stop") {
+							changeCloneStatus(task,"STOPPED")
+								.finally(()=>{
+									router.refresh();
+								})
+						} else {
+							changeClonePause(task, e === "Pause")
+								.finally(()=>{
+									router.refresh();
+								})
+						}
+					}} placeholder={'Change Status'} size={'xs'} />
+				)}
 			</div>
 			<hr className={'my-5'}/>
 			{logs.map((log, i) => {
