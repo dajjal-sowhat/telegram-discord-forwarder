@@ -1,6 +1,6 @@
 import {Bot} from ".prisma/client";
 import {BotType} from "@prisma/client";
-import Discord, {Client, ClientOptions, ResponseLike} from "discord.js";
+import Discord, {ActivityType, Client, ClientOptions, ResponseLike} from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
 import {Telegraf} from "telegraf";
 import {handleClientEvent} from "./events";
@@ -12,12 +12,36 @@ declare global {
 	var INITIALIZED_CLIENTS: {
 		[id: `${Bot['type']}|${Bot['id']}`]: Discord.Client | CustomTelegraf
 	}
-	var INITIALIZE_CLIENTS_LOADING: {
-		[id: `${Bot['type']}|${Bot['id']}`]: boolean
-	}
+	var Refresher: ReturnType<typeof setInterval>
 }
 global.INITIALIZED_CLIENTS ||= {};
-global.INITIALIZE_CLIENTS_LOADING ||= {};
+global.Refresher ||= setInterval(async function (this: {loading: boolean}){
+	if (this.loading) return;
+	this.loading = true;
+
+	for (let [key,client] of Object.entries(global.INITIALIZED_CLIENTS || {})) {
+		const id = key.split("|").at(-1);
+		if (!id) continue;
+		const bot = await prisma.bot.findUnique({
+			where: {
+				id
+			}
+		});
+		if (!bot) {
+			console.error(`[REFRESHER]: Fail to find ${key} in db`);
+			continue;
+		}
+		console.log(`[REFRESHER]: Reinitialize ${key}...`);
+		try {
+			await terminateClient(bot);
+			await getBot(bot)
+		} catch (e) {
+			console.error(`[REFRESHER]: ${key}`, e)
+		}
+	}
+
+	this.loading = false;
+}, 60 * 60 * 1000);
 
 declare module "discord.js" {
 	interface Client {
@@ -29,7 +53,7 @@ declare module "discord.js" {
 	}
 }
 
-export async function getBot(_bot: string | PrismaModelType<'bot'>, type?: BotType) {
+export const getBot = singleFlightFunc(async function(_bot: string | PrismaModelType<'bot'>, type?: BotType) {
 	const bot = typeof _bot === 'string' ? await prisma.bot.findUnique({
 		where: {
 			id: _bot.split("|").at(-1),
@@ -38,45 +62,14 @@ export async function getBot(_bot: string | PrismaModelType<'bot'>, type?: BotTy
 	}) : _bot;
 	if (!bot) throw (`${_bot} Not Found, Unknown Bot!`);
 
-	await waitForClientLoading(bot);
-
 	if (bot.type === "DISCORD" || bot.type === "SELF_DISCORD") {
 		return await getDiscordBot(bot);
 	} else if (bot.type === "TELEGRAM") {
 		return await getTelegramBot(bot);
 	} else throw ("Unsupported Bot Type");
-}
+})
 
-export async function waitForClientLoading(bot: PrismaModelType<'bot'>) {
-	const key = `${bot.type}|${bot.id}` as const;
-	const isLoading = global.INITIALIZE_CLIENTS_LOADING[key];
-	if (isLoading) {
-		let n = 0;
-		console.log(`Waiting for ${key} to initialize...`);
-		do {
-			if (!global.INITIALIZE_CLIENTS_LOADING[key]) break;
-			await new Promise(r => setTimeout(r, 1000));
-			n += 1;
-			if (n > 30) throw (`Waiting for ${key} to initialize... Timeout`);
-		} while (true);
-		console.log(`Waiting for ${key} to initialize... Done`);
-	}
-
-	const client = global.INITIALIZED_CLIENTS[bot.key];
-	if (client && isDiscordClient(client) && !client.isReady()) {
-
-		let n = 0;
-		console.log(`Waiting for ${key} to ready...`);
-		do {
-			await new Promise(r => setTimeout(r, 1000));
-			n += 1;
-			if (n > 30) throw (`Waiting for ${key} to ready... Timeout`);
-		} while (!client.isReady());
-		console.log(`Waiting for ${key} to ready... isReady`);
-	}
-}
-
-export async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
+export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
 	if (_try > 5) throw (`looks like the client ${bot.name}(${bot.key}) unavailable!`);
 
 	const types: BotType[] = ['DISCORD', "SELF_DISCORD"];
@@ -87,8 +80,6 @@ export async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
 	let client = INITIALIZED_CLIENTS[key];
 
 	if (!client) {
-		await waitForClientLoading(bot);
-		INITIALIZE_CLIENTS_LOADING[key] = true;
 		console.log(`Initializing ${bot.type} ${bot.name}...`)
 		client = new Discord.Client(getDiscordClientOptions(bot.type as "DISCORD"));
 		client.bot = {
@@ -96,34 +87,15 @@ export async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
 			key
 		};
 		console.log(`Logging into ${bot.name}|${bot.type} client...`);
-		await new Promise(((resolve, reject) => {
-			const t = setTimeout(() => {
-				reject(`${client.bot.key} Waiting Timeout!`);
-			}, 120000);
-			if (isDiscordClient(client)) {
-				client.login(bot.token).then(() => {
-					clearTimeout(t);
-					resolve(true)
-				}).catch((...args) => {
-					clearTimeout(t);
-					reject(...args);
-				});
-			} else {
-				clearTimeout(t);
-				reject("Invalid type");
-			}
-		}))
-			.catch(async (e) => {
-				console.error(e);
-				INITIALIZE_CLIENTS_LOADING[key] = false;
-				return await getDiscordBot(bot, _try + 1);
-			}).finally(() => {
-				INITIALIZE_CLIENTS_LOADING[key] = false;
-			})
+		const R = await client.login(bot.token)
+			.catch(console.error);
+
+		if (!R) {
+			return await getDiscordBot(bot,_try + 1);
+		}
 
 		client.active = true;
 		INITIALIZED_CLIENTS[key] = client;
-		await waitForClientLoading(bot).catch(console.error);
 		handleClientEvent(bot, client);
 		console.log(`Initializing ${bot.type} ${bot.name}... Done`)
 	}
@@ -131,9 +103,9 @@ export async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
 	if (isDiscordClient(client)) {
 		return client;
 	} else throw ("The Initialized client is not an discord client");
-}
+})
 
-export async function getTelegramBot(bot: PrismaModelType<'bot'>) {
+export const getTelegramBot = singleFlightFunc(async function(bot: PrismaModelType<'bot'>) {
 	if (bot.type !== 'TELEGRAM') throw (`Unknown telegram bot ${bot.type}/${bot.id}`);
 
 	const key = `${bot.type}|${bot.id}` as const;
@@ -141,8 +113,6 @@ export async function getTelegramBot(bot: PrismaModelType<'bot'>) {
 	let client = INITIALIZED_CLIENTS[key];
 
 	if (!client) {
-		await waitForClientLoading(bot);
-		INITIALIZE_CLIENTS_LOADING[key] = true;
 		console.log(`Initializing telegram bot ${bot.name}...`)
 		client = new CustomTelegraf(bot, bot.token);
 		await client.waitToReady();
@@ -150,13 +120,12 @@ export async function getTelegramBot(bot: PrismaModelType<'bot'>) {
 		handleClientEvent(bot, client);
 		client.active = true;
 		console.log(`Initializing telegram bot ${bot.name}... Done`);
-		INITIALIZE_CLIENTS_LOADING[key] = false;
 	}
 
 	if (isTelegramClient(client)) {
 		return client;
 	} else throw (`The Client doesn't seems to be an telegram client!`);
-}
+})
 
 
 export async function InitializeBots() {
@@ -180,12 +149,6 @@ export function isDiscordClient(client: unknown): client is Discord.Client {
 	return !!client && typeof client === 'object' && 'isReady' in client && 'destroy' in client;
 }
 
-export const synchronizedFetch = singleFlightFunc(async function(...args: Parameters<typeof fetch>) {
-	const [url, init] = args;
-	console.log(init?.method || "GET",url?.toString?.().slice(-10)+"...")
-	return fetch(...args);
-},300);
-
 export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): ClientOptions {
 	const intents: ClientOptions['intents'] = ['MessageContent', 'GuildMessages', "Guilds", "GuildMembers"] as const;
 	const needs = type === "SELF_DISCORD" ? {
@@ -199,16 +162,15 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
 	return {
 		...needs,
 		presence: {
-			status: "online"
+			status: "dnd",
+			activities: [
+				{
+					type: ActivityType.Watching,
+					name: "Signals"
+				}
+			]
 		},
-		shards: 'auto',
-		rest: {
-			...needs?.rest || {},
-			makeRequest(url, init) {
-				return synchronizedFetch(url,init as any) as any;
-			},
-
-		}
+		shards: 'auto'
 	}
 }
 
@@ -218,7 +180,6 @@ export async function terminateClient(bot: PrismaModelType<'bot'>) {
 
 
 	try {
-		await waitForClientLoading(bot).catch(console.error);
 		client.active = false;
 		if (isDiscordClient(client)) {
 			client.removeAllListeners();
@@ -231,5 +192,4 @@ export async function terminateClient(bot: PrismaModelType<'bot'>) {
 	}
 
 	delete global.INITIALIZED_CLIENTS[bot.key];
-	delete global.INITIALIZE_CLIENTS_LOADING[bot.key];
 }

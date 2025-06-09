@@ -1,17 +1,18 @@
 import prisma from "../prisma/PrismaClient";
-import Discord, {ChannelType, TextChannel, WebhookCreateOptions, WebhookMessageCreateOptions} from "discord.js";
+import Discord, {ChannelType, TextChannel, WebhookMessageCreateOptions} from "discord.js";
 import {ForwardChannel} from ".prisma/client";
 import {
 	handleTelegramEditMsgText,
 	handleTelegramForward,
 	handleTelegramForwardWithPhoto
-} from "../telegraf/destinationHandler";
+} from "@/telegraf/destinationHandler";
 import {SupportedMessage} from "./types";
 import {ActionResult} from "@prisma/client";
 import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {hexHash} from "next/dist/shared/lib/hash";
+import {singleFlightFunc} from "@/prisma/utils";
 
 export async function getActionOfSource(id: string) {
 	return prisma.forwardAction.findFirst({
@@ -85,7 +86,7 @@ let DUPLICATE_CHECK: {
 	[id: string]: string
 } = {}
 
-export async function handleAction<Source extends ForwardChannel>(
+export const handleAction = singleFlightFunc(async function<Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
 	destination: ForwardChannel,
@@ -164,7 +165,8 @@ export async function handleAction<Source extends ForwardChannel>(
 	} else {
 		if (!isDiscordClient(destinationClient)) throw("Client should be discord client!");
 		const channel = await destinationClient.channels.fetch(destination.channelId).catch(()=>undefined);
-		if (!channel || channel.type !== ChannelType.GuildText) throw(`Invalid Channel type ${channel?.type}`)
+		if (!channel) throw(`Destination Channel not found  [${destinationClient?.bot?.key || destinationClient?.bot?.name}] ${destination.channelId}`);
+		if (channel.type !== ChannelType.GuildText) throw(`Invalid Channel type ${channel?.type}`)
 
 		const webhooks = await channel.fetchWebhooks();
 		const webhook = webhooks.first() || (await channel.createWebhook({
@@ -190,7 +192,7 @@ export async function handleAction<Source extends ForwardChannel>(
 		// @ts-ignore
 		return await webhook[(previousResult ? "editMessage":"send")](...args).then(r => r.id).catch(console.error);
 	}
-}
+}, 300);
 
 
 export async function handleEditAction(sourceId: string, msg: SupportedMessage) {

@@ -10,72 +10,72 @@ import {ssr} from "../../prisma/utils";
 import Refresher from "@/app/bots/Refresher";
 import {PrismaModelType} from "@/prisma/PrismaClient";
 import AddBotComponent from "@/app/bots/AddBotComponent";
+import Link from "next/link";
+import SsrButton from "@/app/bots/SsrButton";
 
 async function Page(props: any) {
-	const searchParams = await props.searchParams;
-	const bots = await prisma.bot.findMany();
+    const searchParams = await props.searchParams;
+    const bots = await prisma.bot.findMany();
 
 
-	return (
-		<div>
-			<details open={!!searchParams.msg}>
-				<summary>
-					Add Bot
-				</summary>
-				<AddBotComponent />
-			</details>
-			<Refresher />
-			<Table
-				data={{
-					head: ['id', 'type', 'name', 'ready',"action"],
-					body: ssr(bots).map(bot => {
-						const client = INITIALIZED_CLIENTS[bot.key];
-						const loading = global.INITIALIZE_CLIENTS_LOADING[bot.key];
+    return (
+        <div>
+            <details open={!!searchParams.msg}>
+                <summary>
+                    Add Bot
+                </summary>
+                <AddBotComponent/>
+            </details>
+            <Refresher/>
+            <Table
+                data={{
+                    head: ['id', 'type', 'name', 'ready', "action"],
+                    body: ssr(bots).map(bot => {
+                        const client = INITIALIZED_CLIENTS[bot.key];
+                        const isReady = client ? isDiscordClient(client) ? client.isReady() : client.ready : false;
+                        return ([
+                            bot.id,
+                            bot.type,
+                            bot.name,
+                            !client ? "Stopped" : isReady ? "Ready" : "Waiting",
+                            <div className={'flex gap-2 justify-start items-center'}>
+                                <Link href={`/bots/${bot.id}`}>
+                                    <Button>
+                                        Edit
+                                    </Button>
+                                </Link>
+                                <SsrButton onClick={async () => {
+                                    'use server';
 
-						return ([
-							bot.id,
-							bot.type,
-							bot.name,
-							loading ? "Loading":!client ? "Stopped" : (isDiscordClient(client) ? client.isReady() : client.ready) ? "Ready" : "Not Ready",
-							<form key={bot.id} action={async(form)=>{
-								'use server';
-								const action = form.get('action')+"";
+                                    if (!isReady) {
+                                        await getBot(bot);
+                                    } else {
+                                        await terminateClient(bot);
+                                    }
+                                    revalidatePath("./")
+                                }}>
+                                    {isReady ? "Stop" : "Start"}
+                                </SsrButton>
+                                <SsrButton confirm onClick={async () => {
+                                    'use server';
 
-								if (action === "START") {
-									await getBot(bot);
-								} else if (action === "EDIT") {
-									redirect(`/bots/${bot.id}`)
-								} else if (action === "EDIT") {
-									redirect(`/bots/${bot.id}/logs`)
-								} else {
-									await terminateClient(bot);
-									if (action === "DELETE") {
-										await prisma.bot.delete({
-											where: {
-												id: bot.id
-											}
-										})
-									}
-								}
-
-								revalidatePath("./");
-							}} className={'flex gap-2 items-center'}>
-								<Select
-									size={'xs'}
-									data={["DELETE",'STOP',"START","EDIT"].reverse()}
-									name={'action'}
-									placeholder={'Select Action'}
-								/>
-								<Button size={'xs'} type={'submit'}>
-									Do
-								</Button>
-							</form>
-						]);
-					})
-				}}
-			/>
-		</div>
-	);
+                                    await terminateClient(bot);
+                                    await prisma.bot.delete({
+                                        where: {
+                                            id: bot.id
+                                        }
+                                    })
+                                    revalidatePath("./")
+                                }}>
+                                    Delete
+                                </SsrButton>
+                            </div>
+                        ]);
+                    })
+                }}
+            />
+        </div>
+    );
 }
 
 export default Page;
