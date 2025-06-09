@@ -1,9 +1,11 @@
 'use client';
 import React, {ComponentProps, useState} from 'react';
 import {Button, ButtonProps, PolymorphicComponentProps} from "@mantine/core";
+import {useRouter} from "next/navigation";
 
 function SsrButton(props: PolymorphicComponentProps<"button", ButtonProps> & {confirm?: boolean}) {
     const [loading, setLoading] = useState(false);
+    const router = useRouter();
     return (
         <Button
             {...props}
@@ -17,6 +19,10 @@ function SsrButton(props: PolymorphicComponentProps<"button", ButtonProps> & {co
                 setLoading(true);
                 func()?.finally?.(()=>{
                     setLoading(false);
+                    router.refresh();
+                    setTimeout(()=>{
+                        router.refresh();
+                    }, 1000)
                 })
             }}
         />

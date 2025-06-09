@@ -4,7 +4,7 @@
 import {useRouter} from "next/navigation";
 import {useEffect, useRef} from "react";
 
-function Refresher({ms = 1000}: {
+function Refresher({ms = 10000}: {
 	ms?: number
 }) {
 	const router = useRouter();

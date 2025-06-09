@@ -1,14 +1,8 @@
-import {Button, Select, Table, TextInput} from "@mantine/core";
-import Discord from "discord.js";
-import {BotType} from "@prisma/client";
-import {redirect} from "next/navigation";
-import {Bot, Prisma} from ".prisma/client";
-import {getBot, getDiscordClientOptions, isDiscordClient, terminateClient} from "../../core/bot/client";
-import CustomTelegraf from "../../telegraf/CustomTelegraf";
+import {Button, Table} from "@mantine/core";
+import {getBot, isDiscordClient, terminateClient} from "@/core/bot/client";
 import {revalidatePath} from "next/cache";
-import {ssr} from "../../prisma/utils";
+import {ssr} from "@/prisma/utils";
 import Refresher from "@/app/bots/Refresher";
-import {PrismaModelType} from "@/prisma/PrismaClient";
 import AddBotComponent from "@/app/bots/AddBotComponent";
 import Link from "next/link";
 import SsrButton from "@/app/bots/SsrButton";
