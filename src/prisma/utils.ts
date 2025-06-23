@@ -25,3 +25,20 @@ export function singleFlightFunc<T extends (this: any, ...args: any[])=>Promise<
 		return currentExecution;
 	} as T;
 }
+
+export function timeoutFunc<T>(
+	promiseFactory: () => Promise<T>,
+	timeoutMs = 10000
+): Promise<T> {
+	const timeoutPromise = new Promise<T>((_, reject) => {
+		const id = setTimeout(() => {
+			clearTimeout(id); // Clear the timeout to prevent it from lingering
+			reject(new Error(`TimeoutError: Promise exceeded ${timeoutMs}ms limit.`));
+		}, timeoutMs);
+	});
+
+	return Promise.race([
+		promiseFactory(), // The user's original promise
+		timeoutPromise    // The timeout mechanism
+	]);
+}
