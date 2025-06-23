@@ -5,9 +5,7 @@ import {getDiscordBot, InitializeBots, terminateClient} from "./core/bot/client"
 declare global {
 	var PlanHandler: ReturnType<typeof setInterval>
 	var SelfBotRestart: ReturnType<typeof setInterval>
-	var EventSetAllowance: boolean
 }
-global.EventSetAllowance ??= false;
 
 global.PlanHandler ||= setInterval(async () => {
 	const payments = await prisma.payment.findMany({

@@ -138,7 +138,6 @@ export async function InitializeBots() {
 	)).catch(() => undefined);
 
 	console.log(`Bots(${bots.length}) has been initialized!`);
-	global.EventSetAllowance = true;
 }
 
 export function isTelegramClient(client: unknown): client is CustomTelegraf {
