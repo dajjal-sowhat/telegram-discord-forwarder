@@ -12,7 +12,7 @@ import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {hexHash} from "next/dist/shared/lib/hash";
-import {singleFlightFunc, Throw, timeoutFunc} from "@/prisma/utils";
+import {singleFlightFunc, sleep, Throw, timeoutFunc} from "@/prisma/utils";
 import { error, log } from "console";
 
 export async function getActionOfSource(id: string) {
@@ -99,7 +99,7 @@ export const handleAction = async <Source extends ForwardChannel>(
 		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
-				10000
+				DISCORD_RATE_LIMIT ? 100000:10000
 			);
 		},2000);
 		DESTINATION_THREAD[destination.type] = thread;
@@ -108,7 +108,7 @@ export const handleAction = async <Source extends ForwardChannel>(
 }
 
 
-
+let DISCORD_RATE_LIMIT: undefined | number;
 const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
@@ -203,6 +203,12 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		}
 	} else {
 		if (!isDiscordClient(destinationClient)) throw("Client should be discord client!");
+		if (DISCORD_RATE_LIMIT && Date.now() < DISCORD_RATE_LIMIT) {
+			const ms = DISCORD_RATE_LIMIT - Date.now();
+			console.warn(`Discord Rate Limit is active! Waiting for ${ms}ms`);
+			sleep(ms);
+			DISCORD_RATE_LIMIT = undefined;
+		}
 		const channel = await destinationClient.channels.fetch(destination.channelId).catch(()=>undefined);
 		if (!channel) throw(`Destination Channel not found  [${destinationClient?.bot?.key || destinationClient?.bot?.name}] ${destination.channelId}`);
 		if (channel.type !== ChannelType.GuildText) throw(`Invalid Channel type ${channel?.type}`)
@@ -231,7 +237,18 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		const func = (previousResult ? "editMessage":"send");
 		console.log(func,webhook.url)
 		// @ts-ignore
-		return await webhook[func](...args).then(r => r.id).catch(console.error);
+		const R = await webhook[func](...args).then(r => r.id || console.error(r)).catch(console.error);
+
+		if (!R) {
+			const res = await fetch(webhook.url, {
+				method: "POST",
+				body: JSON.stringify({content: "."})
+			});
+			const retry = res.headers.get("retry-after") || res.headers.get("x-retry-after") || "0";
+			DISCORD_RATE_LIMIT = Date.now() + +retry;
+		}
+
+		return R;
 	}
 };
 
