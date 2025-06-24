@@ -94,15 +94,15 @@ export const handleAction = async <Source extends ForwardChannel>(
 	destination: ForwardChannel,
 	previousResult?: ActionResult
 ) => {
-	let thread = DESTINATION_THREAD[destination.botId];
+	let thread = DESTINATION_THREAD[destination.type];
 	if (!thread) {
 		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
 				10000
 			);
-		},300);
-		DESTINATION_THREAD[destination.botId] = thread;
+		},2000);
+		DESTINATION_THREAD[destination.type] = thread;
 	}
 	return thread(source,_message,destination,previousResult);
 }
