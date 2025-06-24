@@ -12,8 +12,38 @@ import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {hexHash} from "next/dist/shared/lib/hash";
-import {singleFlightFunc, sleep, Throw, timeoutFunc} from "@/prisma/utils";
-import { error, log } from "console";
+import {singleFlightFunc, sleep, timeoutFunc} from "@/prisma/utils";
+
+declare global {
+	var DiscordRateLimit: ReturnType<typeof setInterval>
+}
+global.DiscordRateLimit = setInterval(async function(this: {loading: boolean}){
+	if (this.loading) return;
+	if (DISCORD_RATE_LIMIT) {
+		if (DISCORD_RATE_LIMIT < Date.now()) {
+			console.log("RATE LIMIT END");
+			DISCORD_RATE_LIMIT = undefined;
+		} else return;
+	}
+	this.loading = true;
+
+	try {
+		const res = await fetch("https://discord.com/api", {
+			method: "HEAD"
+		}).catch(console.error);
+		if (!res) throw("Fail to get discord rate limit");
+
+		const retry = res.headers.get("retry-after");
+		if (retry) {
+			console.warn(`Discord RATE LIMIT ${retry}ms`);
+			DISCORD_RATE_LIMIT = Date.now() + +retry;
+		}
+	} catch (e) {
+		console.error("DRL",e)
+	}
+
+	this.loading = false;
+}, 10000)
 
 export async function getActionOfSource(id: string) {
 	return prisma.forwardAction.findFirst({
@@ -240,23 +270,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		// @ts-ignore
 		const R = await webhook[func](...args).catch(console.error);
 		console.log("WEBHOOK SENT", R?.id ?? R);
-
-		const id = R?.id;
-		if (!R || !id) {
-			console.warn("GET DISCORD RATE LIMIT...");
-			const res = await fetch(webhook.url, {
-				method: "POST",
-				body: JSON.stringify({content: "."})
-			}).catch(e => {
-				console.error("FAIL TO GET DISCORD RATE LIMIT", e);
-				return undefined;
-			});
-			const retry = res ? res.headers.get("retry-after") || res.headers.get("x-retry-after") || "0":"80000";
-			console.warn(`RATE LIMIT ${retry}ms`);
-			DISCORD_RATE_LIMIT = Date.now() + +retry;
-		}
-
-		return id || undefined;
+		return R?.id || undefined;
 	}
 };
 
