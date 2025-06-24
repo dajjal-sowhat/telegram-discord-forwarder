@@ -240,11 +240,16 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		const R = await webhook[func](...args).then(r => r.id || console.error(r)).catch(console.error);
 
 		if (!R) {
+			console.warn("GET DISCORD RATE LIMIT...");
 			const res = await fetch(webhook.url, {
 				method: "POST",
 				body: JSON.stringify({content: "."})
+			}).catch(e => {
+				console.error("FAIL TO GET DISCORD RATE LIMIT", e);
+				return undefined;
 			});
-			const retry = res.headers.get("retry-after") || res.headers.get("x-retry-after") || "0";
+			const retry = res ? res.headers.get("retry-after") || res.headers.get("x-retry-after") || "0":"80000";
+			console.warn(`RATE LIMIT ${retry}ms`);
 			DISCORD_RATE_LIMIT = Date.now() + +retry;
 		}
 
