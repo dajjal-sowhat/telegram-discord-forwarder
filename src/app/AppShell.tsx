@@ -61,6 +61,12 @@ function AppShellPanel(props: any) {
 					prefetch={false}
 					label="Backup/Restore"
 				/>
+				<NavLink
+					component={Link}
+					href="/logs"
+					prefetch={false}
+					label="Logs"
+				/>
 			</AppShell.Navbar>
 			<AppShell.Main>
 					{props.children}

@@ -5,7 +5,7 @@
   "main": "./src/watcher.ts",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npx prisma db push && next build",
     "start": "next start -p 3344",
     "lint": "next lint",
     "nodemon": "nodemon ./src/index.ts",

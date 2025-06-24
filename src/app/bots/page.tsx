@@ -42,6 +42,14 @@ async function Page(props: any) {
                                     'use server';
 
                                     if (!isReady) {
+                                        await prisma.bot.update({
+                                            where: {
+                                                id: bot.id
+                                            },
+                                            data: {
+                                                stopped: false
+                                            }
+                                        })
                                         await getBot(bot);
                                     } else {
                                         await terminateClient(bot);

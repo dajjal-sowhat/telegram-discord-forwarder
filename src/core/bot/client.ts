@@ -13,6 +13,7 @@ declare global {
         [id: `${Bot['type']}|${Bot['id']}`]: Discord.Client | CustomTelegraf
     }
     var Refresher: ReturnType<typeof setInterval>
+    var Runner: ReturnType<typeof setInterval>
 }
 global.INITIALIZED_CLIENTS ||= {};
 global.Refresher ||= setInterval(async function (this: { loading: boolean }) {
@@ -24,7 +25,8 @@ global.Refresher ||= setInterval(async function (this: { loading: boolean }) {
         if (!id) continue;
         const bot = await prisma.bot.findUnique({
             where: {
-                id
+                id,
+                stopped: false
             }
         });
         if (!bot) {
@@ -34,6 +36,14 @@ global.Refresher ||= setInterval(async function (this: { loading: boolean }) {
         console.log(`[REFRESHER]: Reinitialize ${key}...`);
         try {
             await terminateClient(bot);
+            await prisma.bot.update({
+                where: {
+                    id: bot.id
+                },
+                data: {
+                    stopped: false
+                }
+            })
             await getBot(bot)
         } catch (e) {
             console.error(`[REFRESHER]: ${key}`, e)
@@ -42,6 +52,21 @@ global.Refresher ||= setInterval(async function (this: { loading: boolean }) {
 
     this.loading = false;
 }, 60 * 60 * 1000);
+global.Runner ||= setInterval(async function (this: { loading: boolean }){
+    if (this.loading) return;
+    this.loading = true;
+    const bots = await prisma.bot.findMany({
+        where: {
+            stopped: false
+        }
+    });
+
+    for (const bot of bots) {
+        await getBot(bot);
+    }
+
+    this.loading = false;
+}, 60000);
 
 declare module "discord.js" {
     interface Client {
@@ -192,6 +217,13 @@ export async function terminateClient(bot: PrismaModelType<'bot'>) {
     } catch (e) {
         console.error(`Failed to terminate client ${bot.key}`, e)
     }
-
+    await prisma.bot.update({
+        where: {
+            id: bot.id
+        },
+        data: {
+            stopped: true
+        }
+    })
     delete global.INITIALIZED_CLIENTS[bot.key];
 }

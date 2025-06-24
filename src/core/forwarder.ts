@@ -144,7 +144,7 @@ export const handleAction = singleFlightFunc(async function<Source extends Forwa
 	}
 	removeInvalidMentions();
 
-
+	console.log(`Forwarding from ${source.name}(${sourceClient.bot.name}) to ${destination.name}(${destinationClient.bot.name}): ${message?.content?.slice?.(0,20) || "NuLL"} Channel INIT... `);
 	if (destination.type === "TELEGRAM") {
 		if (!isTelegramClient(destinationClient)) throw("Client should be telegram client!");
 		const replyId = message?.replied ? +message.replied : undefined;
@@ -192,7 +192,7 @@ export const handleAction = singleFlightFunc(async function<Source extends Forwa
 		// @ts-ignore
 		return await webhook[(previousResult ? "editMessage":"send")](...args).then(r => r.id).catch(console.error);
 	}
-}, 300);
+}, 500);
 
 
 export async function handleEditAction(sourceId: string, msg: SupportedMessage) {
