@@ -32,7 +32,6 @@ export function timeoutFunc<T>(
     promiseFactory: () => Promise<T>,
     timeoutMs = 10000
 ): Promise<T> {
-    ///METHOD 1
     return new Promise((resolve, reject) => {
         const t = setTimeout(() => reject("TIMEOUT"), timeoutMs);
         const promise = promiseFactory();
@@ -44,20 +43,6 @@ export function timeoutFunc<T>(
                 clearTimeout(t);
             })
     })
-
-    ///METHOD 2
-    const timeoutPromise = new Promise<T>((_, reject) => {
-        const id = setTimeout(() => {
-            console.error("PROMISE TIMEOUT!");
-            clearTimeout(id); // Clear the timeout to prevent it from lingering
-            reject(new Error(`TimeoutError: Promise exceeded ${timeoutMs}ms limit.`));
-        }, timeoutMs);
-    });
-
-    return Promise.race([
-        promiseFactory(), // The user's original promise
-        timeoutPromise    // The timeout mechanism
-    ]);
 }
 
 export function Throw(message: string): never {
