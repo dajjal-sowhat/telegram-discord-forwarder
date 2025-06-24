@@ -157,7 +157,11 @@ export const getTelegramBot = singleFlightFunc(async function (bot: PrismaModelT
 
 
 export async function InitializeBots() {
-    const bots = await prisma.bot.findMany();
+    const bots = await prisma.bot.findMany({
+        where: {
+            stopped: false
+        }
+    });
 
     await Promise.all(bots.map(async (bot) =>
         getBot(bot).catch((e) => {
