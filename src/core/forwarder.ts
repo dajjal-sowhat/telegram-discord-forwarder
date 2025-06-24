@@ -206,7 +206,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		if (DISCORD_RATE_LIMIT && Date.now() < DISCORD_RATE_LIMIT) {
 			const ms = DISCORD_RATE_LIMIT - Date.now();
 			console.warn(`Discord Rate Limit is active! Waiting for ${ms}ms`);
-			sleep(ms);
+			await sleep(ms);
 			DISCORD_RATE_LIMIT = undefined;
 		}
 		const channel = await destinationClient.channels.fetch(destination.channelId).catch(()=>undefined);
