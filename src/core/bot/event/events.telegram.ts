@@ -57,7 +57,7 @@ export class TelegramEventHandler extends ClientEventHandler<CustomTelegraf> {
 			const R = await handleAction(action.source, e, destination).catch(console.error);
 
 			if (!R) {
-				console.log(`${action.source.name} => ${destination.name} action error`);
+				console.error(`${action.source.name} => ${destination.name} action error`);
 				return;
 			}
 			console.log(`${action.source.name} => ${destination.name} action done`);
