@@ -228,9 +228,10 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 			})
 		};
 		const args = previousResult ? [previousResult.destinationTrackId,options] as const:[options] as const
-		console.log(webhook.url)
+		const func = (previousResult ? "editMessage":"send");
+		console.log(func,webhook.url)
 		// @ts-ignore
-		return await webhook[(previousResult ? "editMessage":"send")](...args).then(r => r.id).catch(console.error);
+		return await webhook[func](...args).then(r => r.id).catch(console.error);
 	}
 };
 

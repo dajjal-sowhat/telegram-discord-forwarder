@@ -32,6 +32,7 @@ export function timeoutFunc<T>(
 ): Promise<T> {
 	const timeoutPromise = new Promise<T>((_, reject) => {
 		const id = setTimeout(() => {
+			console.error("PROMISE TIMEOUT!");
 			clearTimeout(id); // Clear the timeout to prevent it from lingering
 			reject(new Error(`TimeoutError: Promise exceeded ${timeoutMs}ms limit.`));
 		}, timeoutMs);
