@@ -12,7 +12,7 @@ import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {hexHash} from "next/dist/shared/lib/hash";
-import {singleFlightFunc, Throw} from "@/prisma/utils";
+import {singleFlightFunc, Throw, timeoutFunc} from "@/prisma/utils";
 import { error, log } from "console";
 
 export async function getActionOfSource(id: string) {
@@ -87,12 +87,34 @@ let DUPLICATE_CHECK: {
 	[id: string]: string
 } = {}
 
-export const handleAction = singleFlightFunc(async function handleForwardAction<Source extends ForwardChannel>(
+let DESTINATION_THREAD: Record<string, typeof DIRECT_handleAction> = {};
+export const handleAction = async <Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
 	destination: ForwardChannel,
 	previousResult?: ActionResult
-) {
+) => {
+	let thread = DESTINATION_THREAD[destination.botId];
+	if (!thread) {
+		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
+			return timeoutFunc(
+				()=>DIRECT_handleAction(...args),
+				10000
+			);
+		},300);
+		DESTINATION_THREAD[destination.botId] = thread;
+	}
+	return thread(source,_message,destination,previousResult);
+}
+
+
+
+const DIRECT_handleAction = async <Source extends ForwardChannel>(
+	source: Source,
+	_message: SupportedMessage,
+	destination: ForwardChannel,
+	previousResult?: ActionResult
+)=>{
 	const [sourceBot, destinationBot] = await Promise.all([
 		prisma.bot.findUniqueOrThrow({
 			where: {
@@ -209,7 +231,7 @@ export const handleAction = singleFlightFunc(async function handleForwardAction<
 		// @ts-ignore
 		return await webhook[(previousResult ? "editMessage":"send")](...args).then(r => r.id).catch(console.error);
 	}
-}, 500);
+};
 
 
 export async function handleEditAction(sourceId: string, msg: SupportedMessage) {
