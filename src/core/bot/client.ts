@@ -78,7 +78,7 @@ declare module "discord.js" {
     }
 }
 
-export const getBot = singleFlightFunc(async function (_bot: string | PrismaModelType<'bot'>, type?: BotType) {
+export const getBot = singleFlightFunc(async function getBot(_bot: string | PrismaModelType<'bot'>, type?: BotType) {
     const bot = typeof _bot === 'string' ? await prisma.bot.findUnique({
         where: {
             id: _bot.split("|").at(-1),
@@ -126,6 +126,14 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
         INITIALIZED_CLIENTS[key] = client;
         handleClientEvent(bot, client);
         console.log(`Initializing ${bot.type} ${bot.name}... Done`)
+        await prisma.bot.update({
+            where: {
+                id: bot.id
+            },
+            data: {
+                stopped: false
+            }
+        })
     }
 
     if (isDiscordClient(client)) {
@@ -133,7 +141,7 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
     } else throw ("The Initialized client is not an discord client");
 })
 
-export const getTelegramBot = singleFlightFunc(async function (bot: PrismaModelType<'bot'>) {
+export const getTelegramBot = singleFlightFunc(async function getTelBot(bot: PrismaModelType<'bot'>) {
     if (bot.type !== 'TELEGRAM') throw (`Unknown telegram bot ${bot.type}/${bot.id}`);
 
     const key = `${bot.type}|${bot.id}` as const;
@@ -148,6 +156,14 @@ export const getTelegramBot = singleFlightFunc(async function (bot: PrismaModelT
         handleClientEvent(bot, client);
         client.active = true;
         console.log(`Initializing telegram bot ${bot.name}... Done`);
+        await prisma.bot.update({
+            where: {
+                id: bot.id
+            },
+            data: {
+                stopped: false
+            }
+        })
     }
 
     if (isTelegramClient(client)) {

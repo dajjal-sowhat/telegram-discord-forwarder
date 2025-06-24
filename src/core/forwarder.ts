@@ -12,7 +12,8 @@ import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {hexHash} from "next/dist/shared/lib/hash";
-import {singleFlightFunc} from "@/prisma/utils";
+import {singleFlightFunc, Throw} from "@/prisma/utils";
+import { error, log } from "console";
 
 export async function getActionOfSource(id: string) {
 	return prisma.forwardAction.findFirst({
@@ -86,12 +87,29 @@ let DUPLICATE_CHECK: {
 	[id: string]: string
 } = {}
 
-export const handleAction = singleFlightFunc(async function<Source extends ForwardChannel>(
+export const handleAction = singleFlightFunc(async function handleForwardAction<Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
 	destination: ForwardChannel,
 	previousResult?: ActionResult
 ) {
+	const [sourceBot, destinationBot] = await Promise.all([
+		prisma.bot.findUniqueOrThrow({
+			where: {
+				id: source.botId
+			}
+		}),
+		prisma.bot.findUniqueOrThrow({
+			where: {
+				id: destination.botId
+			}
+		})
+	]);
+	if (sourceBot.stopped || destinationBot.stopped) {
+		console.error(sourceBot.stopped ? `Source bot ${sourceBot.name} is stopped!` : `Destination bot ${destinationBot.name} is stopped!`);
+		return;
+	}
+
 	const [sourceClient, destinationClient] = await Promise.all([
 		getBot(source.botId),
 		getBot(destination.botId)
@@ -144,7 +162,6 @@ export const handleAction = singleFlightFunc(async function<Source extends Forwa
 	}
 	removeInvalidMentions();
 
-	console.log(`Forwarding from ${source.name}(${sourceClient.bot.name}) to ${destination.name}(${destinationClient.bot.name}): ${message?.content?.slice?.(0,20) || "NuLL"} Channel INIT... `);
 	if (destination.type === "TELEGRAM") {
 		if (!isTelegramClient(destinationClient)) throw("Client should be telegram client!");
 		const replyId = message?.replied ? +message.replied : undefined;

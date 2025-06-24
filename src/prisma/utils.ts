@@ -42,3 +42,7 @@ export function timeoutFunc<T>(
 		timeoutPromise    // The timeout mechanism
 	]);
 }
+
+export function Throw(message: string): never {
+	throw new Error(message);
+}
