@@ -235,11 +235,13 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		};
 		const args = previousResult ? [previousResult.destinationTrackId,options] as const:[options] as const
 		const func = (previousResult ? "editMessage":"send");
-		console.log(func,webhook.url)
+		console.log("WEBHOOK SENDING...");
 		// @ts-ignore
-		const R = await webhook[func](...args).then(r => r.id || console.error(r)).catch(console.error);
+		const R = await webhook[func](...args).catch(console.error);
+		console.log("WEBHOOK SENT", R);
 
-		if (!R) {
+		const id = R?.id;
+		if (!R || !id) {
 			console.warn("GET DISCORD RATE LIMIT...");
 			const res = await fetch(webhook.url, {
 				method: "POST",
@@ -253,7 +255,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 			DISCORD_RATE_LIMIT = Date.now() + +retry;
 		}
 
-		return R;
+		return id || undefined;
 	}
 };
 
