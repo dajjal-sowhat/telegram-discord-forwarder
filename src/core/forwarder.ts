@@ -35,8 +35,8 @@ global.DiscordRateLimit = setInterval(async function(this: {loading: boolean}){
 
 		const retry = res.headers.get("retry-after");
 		if (retry) {
-			console.warn(`Discord RATE LIMIT ${retry}ms`);
-			DISCORD_RATE_LIMIT = Date.now() + +retry;
+			console.warn(`Discord RATE LIMIT ${retry}s`);
+			DISCORD_RATE_LIMIT = Date.now() + (+retry * 1000);
 		}
 	} catch (e) {
 		console.error("DRL",e)
@@ -235,9 +235,9 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	} else {
 		if (!isDiscordClient(destinationClient)) throw("Client should be discord client!");
 		if (DISCORD_RATE_LIMIT && Date.now() < DISCORD_RATE_LIMIT) {
-			const ms = DISCORD_RATE_LIMIT - Date.now();
-			console.warn(`Discord Rate Limit is active! Waiting for ${ms}ms`);
-			await sleep(ms);
+			const secs = DISCORD_RATE_LIMIT - Date.now();
+			console.warn(`Discord Rate Limit is active! Waiting for ${secs}s`);
+			await sleep(secs);
 			DISCORD_RATE_LIMIT = undefined;
 		}
 		const channel = await destinationClient.channels.fetch(destination.channelId).catch(()=>undefined);

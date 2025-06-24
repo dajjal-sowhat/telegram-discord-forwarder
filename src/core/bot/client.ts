@@ -1,11 +1,9 @@
 import {Bot} from ".prisma/client";
 import {BotType} from "@prisma/client";
-import Discord, {ActivityType, Client, ClientOptions, ResponseLike} from "discord.js";
+import Discord, {ActivityType, ClientOptions} from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
-import {Telegraf} from "telegraf";
 import {handleClientEvent} from "./events";
 import {PrismaModelType} from "@/prisma/PrismaClient";
-import {clearTimeout} from "node:timers";
 import {singleFlightFunc, timeoutFunc} from "@/prisma/utils";
 
 declare global {
