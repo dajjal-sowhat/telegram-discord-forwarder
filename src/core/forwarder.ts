@@ -99,7 +99,8 @@ export const handleAction = async <Source extends ForwardChannel>(
 		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
-				DISCORD_RATE_LIMIT ? 100000:10000
+				DISCORD_RATE_LIMIT ? 300000:60000,
+				`${source.name} => ${destination.name} TIMEOUT`
 			);
 		},2000);
 		DESTINATION_THREAD[destination.type] = thread;
@@ -238,7 +239,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		console.log("WEBHOOK SENDING...");
 		// @ts-ignore
 		const R = await webhook[func](...args).catch(console.error);
-		console.log("WEBHOOK SENT", R);
+		console.log("WEBHOOK SENT", R?.id ?? R);
 
 		const id = R?.id;
 		if (!R || !id) {

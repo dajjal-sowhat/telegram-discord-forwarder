@@ -115,7 +115,7 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
         const R = await timeoutFunc(async () =>
             client.login(bot.token)
                 .catch(console.error)
-        ,20000);
+        ,300000, "DISCORD_CLIENT LOGIN TIMEOUT");
 
         if (!R) {
             console.error(`Login Fail[${bot.key}] Retrying... (${_try}/5)`);

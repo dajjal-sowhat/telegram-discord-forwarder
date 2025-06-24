@@ -30,10 +30,14 @@ export function singleFlightFunc<T extends (this: any, ...args: any[]) => Promis
 
 export function timeoutFunc<T>(
     promiseFactory: () => Promise<T>,
-    timeoutMs = 10000
+    timeoutMs = 10000,
+    msg = "TIMEOUT"
 ): Promise<T> {
     return new Promise((resolve, reject) => {
-        const t = setTimeout(() => reject("TIMEOUT"), timeoutMs);
+        const t = setTimeout(() => {
+            console.error(msg);
+            reject(msg)
+        }, timeoutMs);
         const promise = promiseFactory();
 
         promise
