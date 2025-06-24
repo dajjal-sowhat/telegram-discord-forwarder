@@ -217,7 +217,14 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
                 }
             ]
         },
-        shards: 'auto'
+        rest: {
+            ...needs.rest || {},
+            globalRequestsPerSecond: 1,
+            makeRequest: singleFlightFunc(async (url, init)=>{
+                console.warn("REST", init?.method || "UN_M", url);
+                return await fetch(url,init) as any;
+            },300),
+        }
     }
 }
 
