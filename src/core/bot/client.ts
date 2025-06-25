@@ -1,10 +1,10 @@
-import {Bot} from ".prisma/client";
-import {BotType} from "@prisma/client";
-import Discord, {ActivityType, ClientOptions} from "discord.js";
+import { Bot } from ".prisma/client";
+import { BotType } from "@prisma/client";
+import Discord, { ActivityType, ClientOptions } from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
-import {handleClientEvent} from "./events";
-import {PrismaModelType} from "@/prisma/PrismaClient";
-import {singleFlightFunc, timeoutFunc} from "@/prisma/utils";
+import { handleClientEvent } from "./events";
+import { PrismaModelType } from "@/prisma/PrismaClient";
+import { singleFlightFunc, timeoutFunc } from "@/prisma/utils";
 
 declare global {
     var INITIALIZED_CLIENTS: {
@@ -50,7 +50,7 @@ global.Refresher ||= setInterval(async function (this: { loading: boolean }) {
 
     this.loading = false;
 }, 60 * 60 * 1000);
-global.Runner ||= setInterval(async function (this: { loading: boolean }){
+global.Runner ||= setInterval(async function (this: { loading: boolean }) {
     if (this.loading) return;
     this.loading = true;
     const bots = await prisma.bot.findMany({
@@ -112,7 +112,7 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
         console.log(`Logging into ${bot.name}|${bot.type} client...`);
         const R = await timeoutFunc(async () =>
             client.login(bot.token)
-        ,120000, "DISCORD_CLIENT LOGIN TIMEOUT")
+            , 120000, "DISCORD_CLIENT LOGIN TIMEOUT")
             .catch(console.error)
 
         if (!R) {
@@ -194,6 +194,11 @@ export function isDiscordClient(client: unknown): client is Discord.Client {
     return !!client && typeof client === 'object' && 'isReady' in client && 'destroy' in client;
 }
 
+const singleThreadFetch = singleFlightFunc(async function discordFetch(...[url, init]: Parameters<typeof fetch>) {
+    console.warn("REST", init?.method, url);
+    return await fetch(url, init) as any;
+}, 1000);
+
 export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): ClientOptions {
     const intents: ClientOptions['intents'] = ['MessageContent', 'GuildMessages', "Guilds", "GuildMembers"] as const;
     const needs = type === "SELF_DISCORD" ? {
@@ -218,10 +223,7 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
         rest: {
             ...needs.rest || {},
             globalRequestsPerSecond: 1,
-            makeRequest: singleFlightFunc(async (url, init)=>{
-                console.warn("REST", init?.method || "UN_M", url);
-                return await fetch(url,init) as any;
-            },300),
+            makeRequest: singleThreadFetch as any,
         }
     }
 }

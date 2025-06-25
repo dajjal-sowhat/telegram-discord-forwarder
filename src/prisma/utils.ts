@@ -15,15 +15,15 @@ export function singleFlightFunc<T extends (this: any, ...args: any[]) => Promis
     let n = 0;
     return function (this: any, ...args: Parameters<T>) {
         n++;
-        currentExecution = currentExecution.then(async () => {
+        const handle = async () => {
             n--;
-            if (wait) await sleep(wait)
+            if (n > 20) console.warn("[SingleFlightFunc] Too many concurrent executions, this may cause performance issues.");
+            if (wait) await sleep(wait);
             return asyncFunction.apply(this, args);
-        }).catch(async () => {
-            n--;
-            if (wait) await sleep(wait)
-            return asyncFunction.apply(this, args);
-        })
+        }
+        currentExecution = currentExecution
+            .then(handle)
+            .catch(handle)
         return currentExecution;
     } as T;
 }

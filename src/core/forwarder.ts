@@ -63,7 +63,7 @@ export async function getActionOfSource(id: string) {
 	});
 }
 
-
+let DESTINATION_THREAD: Record<string, typeof DIRECT_handleAction> = {};
 export async function convertMessageToBaseObject(client: CustomTelegraf | Discord.Client, destination: ForwardChannel, message: SupportedMessage) {
 	const isWebhook = message instanceof Discord.Message && message.webhookId && message.content.startsWith("Replied") && message.content.split("\n").length > 1;
 	const anyMsg = message as any;
@@ -113,11 +113,6 @@ export async function convertMessageToBaseObject(client: CustomTelegraf | Discor
 	}
 }
 
-let DUPLICATE_CHECK: {
-	[id: string]: string
-} = {}
-
-let DESTINATION_THREAD: Record<string, typeof DIRECT_handleAction> = {};
 export const handleAction = async <Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
@@ -129,10 +124,10 @@ export const handleAction = async <Source extends ForwardChannel>(
 		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
-				DISCORD_RATE_LIMIT ? 300000:60000,
-				`${source.name} => ${destination.name} TIMEOUT`
+				DISCORD_RATE_LIMIT ? 60000:15000,
+				`${source.name} => ${destination.name} ACTION TIMEOUT`
 			);
-		},2000);
+		},1000);
 		DESTINATION_THREAD[destination.type] = thread;
 	}
 	return thread(source,_message,destination,previousResult);
@@ -174,16 +169,6 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	if (!sourceClient?.active || !destinationClient?.active) throw("Some of client are not active!");
 
 	let message = await convertMessageToBaseObject(sourceClient, destination, _message);
-
-	try {
-		const uniqId = `${sourceClient.bot.key}-${source.channelId}`;
-		const uniqueKey = `${hexHash(JSON.stringify(message))}`;
-
-		if (DUPLICATE_CHECK[uniqId] === uniqueKey) return;
-		DUPLICATE_CHECK[uniqId] = uniqueKey;
-	} catch (e) {
-		console.error(`Unique Check error`,e)
-	}
 
 	if (message.imageUrl && typeof message.imageUrl === 'string') {
 		message.imageUrl = await handleWatermark(message.imageUrl).catch(()=>message.imageUrl);
@@ -266,10 +251,8 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		};
 		const args = previousResult ? [previousResult.destinationTrackId,options] as const:[options] as const
 		const func = (previousResult ? "editMessage":"send");
-		console.log("WEBHOOK SENDING...");
 		// @ts-ignore
 		const R = await webhook[func](...args).catch(console.error);
-		console.log("WEBHOOK SENT", R?.id ?? R);
 		return R?.id || undefined;
 	}
 };
