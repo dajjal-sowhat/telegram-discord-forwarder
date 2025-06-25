@@ -235,9 +235,10 @@ const singleThreadFetch = singleFlightFunc(async function discordFetch(...[url, 
     if (global.DiscordRateLimit && Date.now() < global.DiscordRateLimit) {
         const ms = global.DiscordRateLimit - Date.now();
         console.warn(`[DiscordRestApi] Request on hold ${init?.method} ${url}`);
-        sleep(ms);
+        await sleep(ms);
         global.DiscordRateLimit = undefined;
     }
+    console.log(`[DISCORD:REST] ${init?.method || "GET"} ${url}`);
     return await fetch(url, init) as any;
 }, 1000);
 
