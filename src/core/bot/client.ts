@@ -4,7 +4,7 @@ import Discord, { ActivityType, ClientOptions } from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
 import { handleClientEvent } from "./events";
 import { PrismaModelType } from "@/prisma/PrismaClient";
-import { singleFlightFunc, sleep, timeoutFunc } from "@/prisma/utils";
+import {singleFlightFunc, sleep, Throw, timeoutFunc} from "@/prisma/utils";
 
 declare global {
     var INITIALIZED_CLIENTS: {
@@ -103,6 +103,7 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
     let client = INITIALIZED_CLIENTS[key] as Discord.Client;
 
     if (!client) {
+        if (global.DiscordRateLimit) throw("Discord login not available during rate limit");
         console.log(`Initializing ${bot.type} ${bot.name}...`)
         client = new Discord.Client(getDiscordClientOptions(bot.type as "DISCORD"));
         client.bot = {
@@ -203,7 +204,8 @@ declare global {
     var DiscordRateLimit: number | undefined;
 }
 global.DiscordRateLimit ||= undefined;
-global.DiscordRateLimitThread = setInterval(async function (this: { loading: boolean }) {
+
+async function RateLimit(this: { loading: boolean }) {
     if (this.loading) return;
     if (global.DiscordRateLimit) {
         if (global.DiscordRateLimit < Date.now()) {
@@ -216,8 +218,7 @@ global.DiscordRateLimitThread = setInterval(async function (this: { loading: boo
     try {
         const res = await fetch("https://discord.com/api", {
             method: "HEAD"
-        }).catch(console.error);
-        if (!res) throw ("Fail to get discord rate limit");
+        }).catch(console.error) || Throw("Fail to get discord rate limit")
 
         const retry = res.headers.get("retry-after");
         if (retry) {
@@ -229,7 +230,10 @@ global.DiscordRateLimitThread = setInterval(async function (this: { loading: boo
     }
 
     this.loading = false;
-}, 10000)
+}
+const RateLimitTh = RateLimit.bind({loading: false});
+RateLimitTh().catch(console.error);
+global.DiscordRateLimitThread = setInterval(RateLimitTh, 10000)
 
 const singleThreadFetch = singleFlightFunc(async function discordFetch(...[url, init]: Parameters<typeof fetch>) {
     if (global.DiscordRateLimit && Date.now() < global.DiscordRateLimit) {
