@@ -4,7 +4,7 @@ import Discord, { ActivityType, ClientOptions } from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
 import { handleClientEvent } from "./events";
 import { PrismaModelType } from "@/prisma/PrismaClient";
-import { singleFlightFunc, timeoutFunc } from "@/prisma/utils";
+import { singleFlightFunc, sleep, timeoutFunc } from "@/prisma/utils";
 
 declare global {
     var INITIALIZED_CLIENTS: {
@@ -194,7 +194,48 @@ export function isDiscordClient(client: unknown): client is Discord.Client {
     return !!client && typeof client === 'object' && 'isReady' in client && 'destroy' in client;
 }
 
+
+declare global {
+    var DiscordRateLimitThread: ReturnType<typeof setInterval>
+    var DiscordRateLimit: number | undefined;
+}
+global.DiscordRateLimit ||= undefined;
+global.DiscordRateLimitThread = setInterval(async function (this: { loading: boolean }) {
+    if (this.loading) return;
+    if (DiscordRateLimit) {
+        if (DiscordRateLimit < Date.now()) {
+            console.log("RATE LIMIT END");
+            DiscordRateLimit = undefined;
+        } else return;
+    }
+    this.loading = true;
+
+    try {
+        const res = await fetch("https://discord.com/api", {
+            method: "HEAD"
+        }).catch(console.error);
+        if (!res) throw ("Fail to get discord rate limit");
+
+        const retry = res.headers.get("retry-after");
+        if (retry) {
+            console.warn(`Discord RATE LIMIT ${retry}s`);
+            global.DiscordRateLimit = Date.now() + (+retry * 1000);
+        }
+    } catch (e) {
+        console.error("DRL", e)
+    }
+
+    this.loading = false;
+}, 10000)
+
 const singleThreadFetch = singleFlightFunc(async function discordFetch(...[url, init]: Parameters<typeof fetch>) {
+    if (global.DiscordRateLimit && Date.now() < global.DiscordRateLimit) {
+        const ms = global.DiscordRateLimit - Date.now();
+        console.warn(`[DiscordRestApi] REST ${init?.method} ${url} is rate limited!`);
+        console.warn(`Discord Rate Limit is active! Waiting for ${ms / 1000}s`);
+        sleep(ms);
+        global.DiscordRateLimit = undefined;
+    }
     return await fetch(url, init) as any;
 }, 1000);
 
@@ -222,7 +263,7 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
         rest: {
             ...needs.rest || {},
             globalRequestsPerSecond: 1,
-            makeRequest: singleThreadFetch as any,
+            makeRequest: singleThreadFetch as any
         }
     }
 }

@@ -11,39 +11,7 @@ import {ActionResult} from "@prisma/client";
 import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
-import {hexHash} from "next/dist/shared/lib/hash";
 import {singleFlightFunc, sleep, timeoutFunc} from "@/prisma/utils";
-
-declare global {
-	var DiscordRateLimit: ReturnType<typeof setInterval>
-}
-global.DiscordRateLimit = setInterval(async function(this: {loading: boolean}){
-	if (this.loading) return;
-	if (DISCORD_RATE_LIMIT) {
-		if (DISCORD_RATE_LIMIT < Date.now()) {
-			console.log("RATE LIMIT END");
-			DISCORD_RATE_LIMIT = undefined;
-		} else return;
-	}
-	this.loading = true;
-
-	try {
-		const res = await fetch("https://discord.com/api", {
-			method: "HEAD"
-		}).catch(console.error);
-		if (!res) throw("Fail to get discord rate limit");
-
-		const retry = res.headers.get("retry-after");
-		if (retry) {
-			console.warn(`Discord RATE LIMIT ${retry}s`);
-			DISCORD_RATE_LIMIT = Date.now() + (+retry * 1000);
-		}
-	} catch (e) {
-		console.error("DRL",e)
-	}
-
-	this.loading = false;
-}, 10000)
 
 export async function getActionOfSource(id: string) {
 	return prisma.forwardAction.findFirst({
@@ -126,7 +94,7 @@ export const handleAction = async <Source extends ForwardChannel>(
 			console.log(`[${thread_type}] forward ${source.name} => ${destination.name}...`,previousResult);
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
-				DISCORD_RATE_LIMIT ? 60000:15000,
+				global.DiscordRateLimit ? 60000:15000,
 				`${source.name} => ${destination.name} ACTION TIMEOUT`
 			).then(e=>{
 				console.log(`[${thread_type}] forward ${source.name} => ${destination.name}... done`);
@@ -138,8 +106,6 @@ export const handleAction = async <Source extends ForwardChannel>(
 	return thread(source,_message,destination,previousResult);
 }
 
-
-let DISCORD_RATE_LIMIT: undefined | number;
 const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
@@ -222,11 +188,11 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		}
 	} else {
 		if (!isDiscordClient(destinationClient)) throw("Client should be discord client!");
-		if (DISCORD_RATE_LIMIT && Date.now() < DISCORD_RATE_LIMIT) {
-			const secs = DISCORD_RATE_LIMIT - Date.now();
-			console.warn(`Discord Rate Limit is active! Waiting for ${secs}s`);
-			await sleep(secs);
-			DISCORD_RATE_LIMIT = undefined;
+		if (global.DiscordRateLimit && Date.now() < global.DiscordRateLimit) {
+			const ms = global.DiscordRateLimit - Date.now();
+			console.warn(`Discord Rate Limit is active! Waiting for ${ms / 1000}s`);
+			await sleep(ms);
+			global.DiscordRateLimit = undefined;
 		}
 		const channel = await destinationClient.channels.fetch(destination.channelId).catch(()=>undefined);
 		if (!channel) throw(`Destination Channel not found  [${destinationClient?.bot?.key || destinationClient?.bot?.name}] ${destination.channelId}`);
@@ -248,7 +214,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 			content: message.content || ".",
 			avatarURL: message.avatar,
 			username: message.name.replaceAll("discord", "").replaceAll("Discord", ""),
-			...message.imageUrl && ({
+			...(message.imageUrl && {
 				files: [message.imageUrl]
 			})
 		};
