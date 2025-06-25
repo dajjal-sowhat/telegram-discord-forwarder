@@ -10,14 +10,14 @@ export async function sleep(ms: number) {
     return new Promise(r => setTimeout(r, ms)).catch(console.error);
 }
 
-export function singleFlightFunc<T extends (this: any, ...args: any[]) => Promise<any>>(asyncFunction: T, wait = 0): T {
+export function singleFlightFunc<T extends (this: any, ...args: any[]) => Promise<any>>(asyncFunction: T, wait = 0, name = asyncFunction.name): T {
     let currentExecution = Promise.resolve();
     let n = 0;
     return function (this: any, ...args: Parameters<T>) {
         n++;
         const handle = async () => {
             n--;
-            if (n > 20) console.warn(`[SingleFlightFunc:${asyncFunction.name || "UnknownFunction"}] Too many concurrent executions ${n}, this may cause performance issues.`);
+            if (n > 20) console.warn(`[SingleFlightFunc:${name || "UnknownFunction"}] Too many concurrent executions ${n}, this may cause performance issues.`);
             if (wait) await sleep(wait);
             return asyncFunction.apply(this, args);
         }

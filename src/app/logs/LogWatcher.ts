@@ -17,8 +17,11 @@ export function InitLogWatcher() {
         console[key] = (...args: any[]) => {
             origin(...args);
             try {
-                const log = args.map(o=>o?.toString?.()).join(" ");
-                onLog(key,`${new Date().toLocaleTimeString()} ${log}`)
+                const log = args.map(o=>
+                    typeof o === "object" ? `\n${JSON.stringify(o,null,2)}\n`:
+                    o?.toString?.()
+                ).join(" ");
+                onLog(key,`${log}`)
             } catch (e) {
                 err(e)
             }

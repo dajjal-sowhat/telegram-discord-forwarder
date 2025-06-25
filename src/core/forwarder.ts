@@ -119,16 +119,21 @@ export const handleAction = async <Source extends ForwardChannel>(
 	destination: ForwardChannel,
 	previousResult?: ActionResult
 ) => {
-	let thread = DESTINATION_THREAD[destination.type];
+	const thread_type = destination.type === "TELEGRAM" ? "TELEGRAM":"DISCORD"
+	let thread = DESTINATION_THREAD[thread_type];
 	if (!thread) {
 		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
+			console.log(`[${thread_type}] forward ${source.name} => ${destination.name}...`,previousResult);
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
 				DISCORD_RATE_LIMIT ? 60000:15000,
 				`${source.name} => ${destination.name} ACTION TIMEOUT`
-			);
-		},1000);
-		DESTINATION_THREAD[destination.type] = thread;
+			).then(e=>{
+				console.log(`[${thread_type}] forward ${source.name} => ${destination.name}... done`);
+				return e;
+			});
+		},1000, `ForwardHandle:${thread_type}`);
+		DESTINATION_THREAD[thread_type] = thread;
 	}
 	return thread(source,_message,destination,previousResult);
 }
@@ -173,9 +178,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	if (message.imageUrl && typeof message.imageUrl === 'string') {
 		message.imageUrl = await handleWatermark(message.imageUrl).catch(()=>message.imageUrl);
 	}
-
-	console.log(`Forwarding from ${source.name}(${sourceClient.bot.name}) to ${destination.name}(${destinationClient.bot.name}): ${message?.content?.slice?.(0,20) || "NuLL"}...`);
-
+	
 	if (_message instanceof Discord.Message) {
 		[
 			...Array.from(_message.mentions.channels.values()),
@@ -253,6 +256,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		const func = (previousResult ? "editMessage":"send");
 		// @ts-ignore
 		const R = await webhook[func](...args).catch(console.error);
+
 		return R?.id || undefined;
 	}
 };
