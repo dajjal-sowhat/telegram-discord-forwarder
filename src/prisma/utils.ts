@@ -31,12 +31,11 @@ export function singleFlightFunc<T extends (this: any, ...args: any[]) => Promis
 export function timeoutFunc<T>(
     promiseFactory: () => Promise<T>,
     timeoutMs = 10000,
-    msg = "TIMEOUT"
+    msg = `${promiseFactory.name || "UnknownFunc"} TIMEOUT`
 ): Promise<T> {
     return new Promise((resolve, reject) => {
         const t = setTimeout(() => {
-            console.error(msg);
-            reject(msg)
+            reject(`[timeoutFunc:${(timeoutMs/1000).toFixed(2)}s] ${msg}`)
         }, timeoutMs);
         const promise = promiseFactory();
 

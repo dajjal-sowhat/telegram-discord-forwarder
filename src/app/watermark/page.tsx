@@ -34,7 +34,8 @@ async function Page(props: any) {
 						fs.rmSync(watermarkPathConfig.valuePath)
 					} catch {
 					}
-					fs.writeFileSync(watermarkPathConfig.valuePath, await file.arrayBuffer().then(e => Buffer.from(e)));
+					const buffer = await file.arrayBuffer().then(e => Buffer.from(e));
+					fs.writeFileSync(watermarkPathConfig.valuePath, buffer as any);
 					data.watermarkPath = watermarkPathConfig.valuePath;
 				}
 

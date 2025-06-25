@@ -110,10 +110,13 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
             key
         };
         console.log(`Logging into ${bot.name}|${bot.type} client...`);
-        const R = await timeoutFunc(async () =>
-            client.login(bot.token)
-            , 120000, "DISCORD_CLIENT LOGIN TIMEOUT")
-            .catch(console.error)
+        const R = await timeoutFunc(
+            async () => (
+                client.login(bot.token)
+            ),
+            120000,
+            "DISCORD_CLIENT LOGIN TIMEOUT"
+        ).catch(console.error)
 
         if (!R) {
             console.error(`Login Fail[${bot.key}] Retrying... (${_try}/5)`);
@@ -202,10 +205,10 @@ declare global {
 global.DiscordRateLimit ||= undefined;
 global.DiscordRateLimitThread = setInterval(async function (this: { loading: boolean }) {
     if (this.loading) return;
-    if (DiscordRateLimit) {
-        if (DiscordRateLimit < Date.now()) {
+    if (global.DiscordRateLimit) {
+        if (global.DiscordRateLimit < Date.now()) {
             console.log("RATE LIMIT END");
-            DiscordRateLimit = undefined;
+            global.DiscordRateLimit = undefined;
         } else return;
     }
     this.loading = true;
@@ -218,7 +221,7 @@ global.DiscordRateLimitThread = setInterval(async function (this: { loading: boo
 
         const retry = res.headers.get("retry-after");
         if (retry) {
-            console.warn(`Discord RATE LIMIT ${retry}s`);
+            console.warn(`[DiscordRateLimit] Rate Limit detected, retry-after ${retry}s`);
             global.DiscordRateLimit = Date.now() + (+retry * 1000);
         }
     } catch (e) {
@@ -231,8 +234,7 @@ global.DiscordRateLimitThread = setInterval(async function (this: { loading: boo
 const singleThreadFetch = singleFlightFunc(async function discordFetch(...[url, init]: Parameters<typeof fetch>) {
     if (global.DiscordRateLimit && Date.now() < global.DiscordRateLimit) {
         const ms = global.DiscordRateLimit - Date.now();
-        console.warn(`[DiscordRestApi] REST ${init?.method} ${url} is rate limited!`);
-        console.warn(`Discord Rate Limit is active! Waiting for ${ms / 1000}s`);
+        console.warn(`[DiscordRestApi] Request on hold ${init?.method} ${url}`);
         sleep(ms);
         global.DiscordRateLimit = undefined;
     }
