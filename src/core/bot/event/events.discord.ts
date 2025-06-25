@@ -3,7 +3,8 @@ import { getActionOfSource, handleAction, handleEditAction } from "../../forward
 import prisma from "../../../prisma/PrismaClient";
 import ClientEventHandler, { GetEvent, SetEvent } from "./events.handler";
 import { createPayment } from "@/app/plan/action";
-import { getBot } from "@/core/bot/client";
+import { getBot, terminateClient } from "@/core/bot/client";
+import { Throw } from "@/prisma/utils";
 
 
 export default class DiscordEventHandler extends ClientEventHandler<Discord.Client> {
@@ -20,13 +21,11 @@ export default class DiscordEventHandler extends ClientEventHandler<Discord.Clie
 		if (!action) return;
 
 		await Promise.all(action.destinations.map(async ({ destination }) => {
-			console.log(`${action.source.name} => ${destination.name}...`);
 			const result = await handleAction(action.source, e, destination).catch(console.error);
 			if (!result) {
 				console.error(`${action.source.name} => ${destination.name} action error`);
 				return;
 			}
-			console.log(`${action.source.name} => ${destination.name} action done`);
 			await prisma.actionResult.create({
 				data: {
 					sourceTrackId: e.id,
@@ -49,7 +48,6 @@ export default class DiscordEventHandler extends ClientEventHandler<Discord.Clie
 
 	@SetEvent("interactionCreate")
 	async onAction(...[e]: GetEvent<'interactionCreate'>) {
-		console.log("HERE IS EVENT", e);
 		if (e.isButton()) {
 			const msg = await e.reply({
 				flags: ['Ephemeral'],
@@ -101,12 +99,17 @@ export default class DiscordEventHandler extends ClientEventHandler<Discord.Clie
 
 	@SetEvent("error")
 	async error(e: GetEvent<'error'>) {
-		const key = `${this.client.bot.type}|${this.client.bot.id}` as const;
-		console.error(`GOT ERROR FROM DISCORD CLIENT ${key}!`, e);
+		const id = this.client.user?.id || this.client?.bot?.id || Throw("Where the fuck is bot id", this.client);
+		const bot = await prisma.bot.findUnique({
+			where: {
+				id
+			}
+		}) || Throw("Bot not found",id);
+
+		console.error(`GOT ERROR FROM DISCORD CLIENT ${bot.key}!`, e);
 		console.warn('Reconnecting...');
-		this.client.active = false;
-		await this.client.destroy().catch(console.error);
-		delete INITIALIZED_CLIENTS[key];
-		getBot(key).catch(() => console.error(`FAIL TO INITIALIZE BOT ${key}`));
+		
+		await terminateClient(bot).catch(console.error);
+		getBot(bot).catch(() => console.error(`FAIL TO INITIALIZE BOT ${bot.key}`));
 	}
 }

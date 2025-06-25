@@ -17,7 +17,7 @@ export function singleFlightFunc<T extends (this: any, ...args: any[]) => Promis
         n++;
         const handle = async () => {
             n--;
-            if (n > 20) console.warn("[SingleFlightFunc] Too many concurrent executions, this may cause performance issues.");
+            if (n > 20) console.warn(`[SingleFlightFunc:${asyncFunction.name || "UnknownFunction"}] Too many concurrent executions ${n}, this may cause performance issues.`);
             if (wait) await sleep(wait);
             return asyncFunction.apply(this, args);
         }
@@ -49,6 +49,7 @@ export function timeoutFunc<T>(
     })
 }
 
-export function Throw(message: string): never {
-    throw new Error(message);
+export function Throw(...args: any[]): never {
+    console.error(...args);
+    throw new Error(...args);
 }

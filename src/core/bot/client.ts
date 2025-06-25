@@ -195,7 +195,6 @@ export function isDiscordClient(client: unknown): client is Discord.Client {
 }
 
 const singleThreadFetch = singleFlightFunc(async function discordFetch(...[url, init]: Parameters<typeof fetch>) {
-    console.warn("REST", init?.method, url);
     return await fetch(url, init) as any;
 }, 1000);
 
