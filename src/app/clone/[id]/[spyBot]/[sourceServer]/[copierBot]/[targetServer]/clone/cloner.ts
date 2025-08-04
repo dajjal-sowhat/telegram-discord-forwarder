@@ -1,10 +1,10 @@
-import {ClonerFilters} from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/SelectFilter";
+import { ClonerFilters } from "@/app/clone/[id]/[spyBot]/[sourceServer]/[copierBot]/[targetServer]/SelectFilter";
 import * as OriginConsole from "console";
-import {getBot, getDiscordBot, isDiscordClient} from "@/core/bot/client";
-import {CloneTask, Prisma} from "@prisma/client";
-import {PrismaModelType} from "@/prisma/PrismaClient";
-import {ChannelType, GuildChannel, TextChannel} from "discord.js";
-import {sleep} from "@/prisma/utils";
+import { getBot, getDiscordBot, isDiscordClient } from "@/core/bot/client";
+import { CloneTask, Prisma } from "@prisma/client";
+import { PrismaModelType } from "@/prisma/PrismaClient";
+import { ChannelType, GuildChannel, TextChannel } from "discord.js";
+import { sleep, timeoutFunc } from "@/prisma/utils";
 
 declare global {
 	var tasks: {
@@ -29,7 +29,7 @@ export class CloneTaskHandler {
 	task: PrismaModelType<'cloneTask'>;
 	completeActions = 0;
 	totalActions = 0;
-	logFunction: ((str: string, percent: number) => any) | undefined = undefined;
+	logFunction: Record<string, (str: string, percent: number) => any> = {};
 	calcTotalAction = false;
 	private _paused = false;
 	actionSleep = 1500;
@@ -38,7 +38,7 @@ export class CloneTaskHandler {
 	} = {}
 
 	set pause(o: boolean) {
-		this.log = `Task ${o ? "Paused":"Resumed"}...`;
+		this.log = `Task ${o ? "Paused" : "Resumed"}...`;
 		this._paused = o;
 	}
 
@@ -50,9 +50,11 @@ export class CloneTaskHandler {
 	set log(log: any) {
 		if (this.calcTotalAction) return;
 		log = log + "";
-		try {
-			this.logFunction?.(log, this.percent);
-		} catch {
+		for (const func of Object.values(this.logFunction)) {
+			try {
+				func?.(log, this.percent);
+			} catch {
+			}
 		}
 		OriginConsole.log(`TASK:${this.task.id}: ${log}`);
 	}
@@ -72,7 +74,7 @@ export class CloneTaskHandler {
 		do {
 			this.log = "Task is paused"
 			await sleep(5000);
-		} while(this._paused)
+		} while (this._paused)
 	}
 
 	async doAction<T extends object | string>(actionName: string, array: T[], each: (o: T, i: number) => any, duplicate?: (o: T) => boolean) {
@@ -92,14 +94,12 @@ export class CloneTaskHandler {
 					this.log = (`${actionName}(${n}/${array.length})... Duplicate!`);
 					continue;
 				}
-				await new Promise(r => setTimeout(r, this.actionSleep));
-				await new Promise((r, reject) => {
-					const R = each(item, n - 1);
-					if (R instanceof Promise) {
-						const t = setTimeout(() => reject(`${actionName}(${n}/${array.length})... Error! Action Timeout`), this.actionSleep * 5);
-						R.finally(() => clearTimeout(t)).then(r).catch(reject);
-					} else r(true);
-				})
+				await sleep(this.actionSleep);
+				await timeoutFunc(
+					() => each(item, n - 1),
+					60_000,
+					`${actionName}(${n}/${array.length})... Error! Action Timeout`
+				);
 				this.log = (`${actionName}(${n}/${array.length})... Done`)
 			} catch (e: any) {
 				this.log = (`${actionName}(${n}/${array.length})... Error!`)
@@ -123,8 +123,8 @@ export class CloneTaskHandler {
 
 		this.task.status = o;
 		prisma.cloneTask.update({
-			where: {id: this.task.id},
-			data: {status: o}
+			where: { id: this.task.id },
+			data: { status: o }
 		}).catch(this.error).then(() => {
 			if (o === "RUNNING") this.handler.bind(this)().catch(console.error);
 		});
@@ -162,13 +162,13 @@ export class CloneTaskHandler {
 		};
 		console.log("RUNNING");
 
-		this.task = await prisma.cloneTask.findUniqueOrThrow({where: {id: this.task.id}});
+		this.task = await prisma.cloneTask.findUniqueOrThrow({ where: { id: this.task.id } });
 
 		const [guild1, guild2, tracksRecord] = await Promise.all([
 			this.task.sourceGuild(),
 			this.task.destinationGuild(),
 			prisma.cloneTaskTrack.findMany({
-				where: {taskId: this.task.id}
+				where: { taskId: this.task.id }
 			})
 		]).catch(() => [undefined, undefined]);
 
@@ -200,7 +200,7 @@ export class CloneTaskHandler {
 		}
 
 
-		const {filters = [] as (keyof typeof ClonerFilters)[], channels = []} = this.task;
+		const { filters = [] as (keyof typeof ClonerFilters)[], channels = [] } = this.task;
 
 		if (filters.includes("delete_destination_role")) {
 			await this.doAction("Delete Destination Roles", Array.from(guild2.roles.cache.values()), async (ch) => {
@@ -216,7 +216,7 @@ export class CloneTaskHandler {
 			await this.doAction("Copying Server Roles", Array.from(guild1.roles.cache.values()), async role => {
 				const creation = guild1.roles.everyone.id !== role.id ? await guild2.roles.create({
 					...role,
-					icon: role.icon ? role.iconURL({size: 2048}) : undefined
+					icon: role.icon ? role.iconURL({ size: 2048 }) : undefined
 				}) : guild1.roles.everyone;
 				await addTrack(role.id, creation.id)
 			}, role => !!guild2.roles.cache.find(o => o.id === tracks[role.id]));
@@ -224,7 +224,7 @@ export class CloneTaskHandler {
 		if (filters.includes("set_information")) {
 			await this.doList('Set Information', [
 				() => guild2.setName(guild1.name),
-				() => guild2.setIcon(guild1.iconURL({size: 2048}))
+				() => guild2.setIcon(guild1.iconURL({ size: 2048 }))
 			])
 		}
 
@@ -316,7 +316,7 @@ export class CloneTaskHandler {
 
 						await prisma.forwardChannel.upsert({
 							where: {
-								id:{
+								id: {
 									channelId: data.channelId,
 									botId: data.botId
 								}
@@ -337,7 +337,7 @@ export class CloneTaskHandler {
 								}
 							}
 						}
-					}).catch(()=>this.log = "Fail to create forward action");
+					}).catch(() => this.log = "Fail to create forward action");
 				}
 			} catch (e: any) {
 				this.error(`Fail to set forward actions ${e?.message ?? e}`)
@@ -358,7 +358,7 @@ export function getCloneHandler(task: PrismaModelType<'cloneTask'>) {
 	return global.tasks[task.id] || (new CloneTaskHandler(task));
 }
 
-export async function serverClone(taskOrParams: typeof ClonerParams | PrismaModelType<'cloneTask'>, body: typeof ClonerBody, log?: (str: string, percent: number) => any, defaultTask?: CloneTask) {
+export async function serverClone(taskOrParams: typeof ClonerParams | PrismaModelType<'cloneTask'>, body: typeof ClonerBody, defaultTask?: CloneTask) {
 	function isTask(a1: any): a1 is PrismaModelType<'cloneTask'> {
 		return !!a1 && 'params' in a1 && 'channels' in a1;
 	}
@@ -371,14 +371,12 @@ export async function serverClone(taskOrParams: typeof ClonerParams | PrismaMode
 		status: isTask(taskOrParams) ? taskOrParams.status : "PREPARE"
 	};
 	task = await prisma.cloneTask.upsert({
-		where: {id: isTask(taskOrParams) ? taskOrParams.id : crypto.randomUUID()},
+		where: { id: isTask(taskOrParams) ? taskOrParams.id : crypto.randomUUID() },
 		create: data,
 		update: data
 	})
 
 	const handler = getCloneHandler(task);
-	if (log) {
-		handler.logFunction = log;
-	}
 	handler.status = "RUNNING";
+	return handler;
 }
