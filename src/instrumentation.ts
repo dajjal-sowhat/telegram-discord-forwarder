@@ -2,6 +2,7 @@ import {Application, ChannelType, Client, ClientApplication} from "discord.js";
 import * as Prisma from "./prisma/PrismaClient";
 import {getDiscordBot, InitializeBots, terminateClient} from "./core/bot/client";
 import {InitLogWatcher} from "@/app/logs/LogWatcher";
+import initializeCleaner from "./core/cleaner";
 
 declare global {
 	var PlanHandler: ReturnType<typeof setInterval>
@@ -79,4 +80,5 @@ export async function register() {
 	await Prisma.default.bot.findMany();
 	InitLogWatcher();
 	InitializeBots().catch(console.error);
+	initializeCleaner().catch(console.error)
 }

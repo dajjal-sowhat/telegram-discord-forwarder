@@ -169,6 +169,8 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	}
 	removeInvalidMentions();
 
+	console.log(`[${sourceBot.name}/${sourceBot.type}] forward ${source.name} => ${destination.name}...`,previousResult);
+
 	if (destination.type === "TELEGRAM") {
 		if (!isTelegramClient(destinationClient)) throw("Client should be telegram client!");
 		const replyId = message?.replied ? +message.replied : undefined;
@@ -194,7 +196,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 			await sleep(ms);
 			global.DiscordRateLimit = undefined;
 		}
-		const channel = await destinationClient.channels.fetch(destination.channelId).catch(()=>undefined);
+		const channel = await destinationClient.channels.fetch(destination.channelId).catch(console.error);
 		if (!channel) throw(`Destination Channel not found  [${destinationClient?.bot?.key || destinationClient?.bot?.name}] ${destination.channelId}`);
 		if (channel.type !== ChannelType.GuildText) throw(`Invalid Channel type ${channel?.type}`)
 

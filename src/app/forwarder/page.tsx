@@ -69,6 +69,7 @@ export async function getForwards(skip = 0, take = 10) {
 				name: cat.name,
 				id: cat.id,
 				type: "DISCORD_CATEGORY",
+				botId: bot.id
 			},
 			sourceId: cat.id,
 			destinations: forwards.filter(f => {
@@ -94,16 +95,16 @@ function ChannelView(props: (BasicChannelType) & {
 	action?: ReactNode
 }) {
 	const {action, ...forward} = props;
-
+	const target = isSource(forward) ? forward.source : forward.destination;
 
 	return (
 		<details className={'rounded-lg bg-white/10 border p-2'}>
 			<summary className={'flex gap-2 items-center justify-between w-full'}>
 				<div className={'flex gap-2 items-center'}>
 					<Image
-						src={(isSource(forward) ? forward.source : forward.destination).type === "TELEGRAM" ? '/tel.png' : "/discord.png"}
+						src={target.type === "TELEGRAM" ? '/tel.png' : `/api/discord-icon?${new URLSearchParams(Object.fromEntries(Object.entries(target).filter(([_,v]) => typeof v === 'string')) as Record<string,string>).toString()}`}
 						width={isSource(forward) ? 60 : 30} height={isSource(forward) ? 50 : 30} alt={''}
-						className={'object-cover'}/>
+						className={'object-cover rounded-lg'}/>
 					{isSource(forward) ? (
 						<>
 							<div>

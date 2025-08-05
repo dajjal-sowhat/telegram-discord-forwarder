@@ -112,4 +112,17 @@ export default class DiscordEventHandler extends ClientEventHandler<Discord.Clie
 		await terminateClient(bot).catch(console.error);
 		getBot(bot).catch(() => console.error(`FAIL TO INITIALIZE BOT ${bot.key}`));
 	}
+
+	@SetEvent("channelDelete")
+	async chDel(...[e]: GetEvent<"channelDelete">) {
+		await prisma.forwardChannel.delete({
+			where: {
+				id: {
+					botId: e.client.user.id,
+					channelId: e.id
+				}
+			}
+		}).catch(()=>undefined);
+		console.warn(`${'name' in e ? e.name:"Unknown"} channel deleted`)
+	}
 }
