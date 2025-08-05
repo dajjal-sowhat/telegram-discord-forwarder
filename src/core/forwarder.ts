@@ -91,6 +91,7 @@ export const handleAction = async <Source extends ForwardChannel>(
 	let thread = DESTINATION_THREAD[thread_type];
 	if (!thread) {
 		thread = singleFlightFunc(async (...args: Parameters<typeof DIRECT_handleAction>) => {
+			const [source,_message, destination,previousResult] = args;
 			console.log(`[${thread_type}] forward ${source.name} => ${destination.name}...`,previousResult);
 			return timeoutFunc(
 				()=>DIRECT_handleAction(...args),
