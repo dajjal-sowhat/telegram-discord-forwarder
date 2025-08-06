@@ -17,7 +17,7 @@ export default class DiscordEventHandler extends ClientEventHandler<Discord.Clie
 			...e,
 			messageId: e.id
 		}) as any).catch(() => e.reference);
-		const action = await getActionOfSource(e.channelId + "");
+		const action = await getActionOfSource(this?.client?.bot?.id || this.client?.user?.id || Throw("Bot id not found"), e.channelId + "");
 		if (!action) return;
 
 		await Promise.all(action.destinations.map(async ({ destination }) => {
@@ -33,7 +33,7 @@ export default class DiscordEventHandler extends ClientEventHandler<Discord.Clie
 					actionId: action.id,
 					destinationId: destination.channelId
 				}
-			})
+			}).catch(console.error);
 		})).catch(console.error);
 	}
 

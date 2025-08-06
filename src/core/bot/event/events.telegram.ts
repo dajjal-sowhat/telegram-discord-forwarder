@@ -3,6 +3,7 @@ import CustomTelegraf from "../../../telegraf/CustomTelegraf";
 import prisma from "../../../prisma/PrismaClient";
 import { getActionOfSource, handleAction, handleEditAction } from "@/core/forwarder";
 import { getBot } from "@/core/bot/client";
+import { Throw } from "@/prisma/utils";
 
 
 export class TelegramEventHandler extends ClientEventHandler<CustomTelegraf> {
@@ -49,7 +50,7 @@ export class TelegramEventHandler extends ClientEventHandler<CustomTelegraf> {
 		}
 
 		const id = e.chat.id + "";
-		const action = await getActionOfSource(id).catch(() => undefined);
+		const action = await getActionOfSource(this?.client?.bot?.id || this.client?.me?.id?.toString?.() || Throw("Bot id not found"),id).catch(() => undefined);
 		if (!action) return;
 
 		await Promise.all(action.destinations.map(async ({ destination }) => {
@@ -69,7 +70,7 @@ export class TelegramEventHandler extends ClientEventHandler<CustomTelegraf> {
 					destinationId: destination.channelId
 				}
 			};
-			await prisma.actionResult.create(p as any)
+			await prisma.actionResult.create(p as any).catch(console.error);
 		})).catch(console.error);
 	}
 

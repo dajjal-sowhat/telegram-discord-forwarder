@@ -23,6 +23,10 @@ export function handleClientEvent(bot: Bot, client: Discord.Client | CustomTeleg
                     console.warn(`Invalid Unique key detected! ${func.event}`);
                     return;
                 }
+                if (!client.active) {
+                    console.error(`[${client.bot?.name || client?.uniqKey}:${func.event}] Client is not active, event handler will not be executed!`);
+                    return;
+                }
                 (func as unknown as Function).bind(handler)(...args);
             });
             console.log(func.event, `has been set on ${bot.name} client!`);

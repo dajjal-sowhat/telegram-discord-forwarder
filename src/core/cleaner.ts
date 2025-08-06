@@ -50,6 +50,12 @@ const thread = singleFlightFunc(async function (this: typeof state) {
     })
     for (const action of uselessActions) {
         if (action._count.destinations !== 0) continue;
+        const count = await prisma.forwardActionDestination.count({
+            where: {
+                actionId: action.id
+            }
+        });
+        if (count !== 0) continue;
         const R = await prisma.forwardAction.delete({
             where: {
                 id: action.id

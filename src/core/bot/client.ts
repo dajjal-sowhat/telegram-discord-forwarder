@@ -76,7 +76,7 @@ declare module "discord.js" {
     }
 }
 
-export const getBot = singleFlightFunc(async function getBot(_bot: string | PrismaModelType<'bot'>, type?: BotType) {
+export const getBot = singleFlightFunc(async function(_bot: string | PrismaModelType<'bot'>, type?: BotType) {
     const bot = typeof _bot === 'string' ? await prisma.bot.findUnique({
         where: {
             id: _bot.split("|").at(-1),
@@ -89,7 +89,7 @@ export const getBot = singleFlightFunc(async function getBot(_bot: string | Pris
         return await getDiscordBot(bot);
     } else if (bot.type === "TELEGRAM") {
         return await getTelegramBot(bot);
-    } else throw ("Unsupported Bot Type");
+    } else throw (`Unsupported Bot Type ${bot.type}`);
 })
 
 export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
@@ -278,7 +278,6 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
 export async function terminateClient(bot: PrismaModelType<'bot'>) {
     const client = await getBot(bot);
     if (!client) return;
-
 
     try {
         client.active = false;

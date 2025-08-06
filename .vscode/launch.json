@@ -1,0 +1,55 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "DEBUG",
+            "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+            "runtimeArgs": [
+                "--import",
+                "file:/C:/Program%20Files/JetBrains/PhpStorm%202025.1/plugins/nodeJS/js/ts-file-loader/node_modules/tsx/dist/loader.cjs",
+                "--watch",
+                "./src/debug.ts"
+            ],
+            "console": "internalConsole",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "TS File Runner",
+            "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+            "runtimeArgs": [
+                "--import",
+                "file:/C:/Program%20Files/JetBrains/PhpStorm%202025.1/plugins/nodeJS/js/ts-file-loader/node_modules/tsx/dist/loader.cjs",
+                "${file}"
+            ],
+            "console": "integratedTerminal",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Watch TS File",
+            "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+            "runtimeArgs": [
+                "--import",
+                "file:/C:/Program%20Files/JetBrains/PhpStorm%202025.1/plugins/nodeJS/js/ts-file-loader/node_modules/tsx/dist/loader.cjs",
+                "--watch",
+                "${file}"
+            ],
+            "console": "internalConsole",
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        }
+    ]
+}

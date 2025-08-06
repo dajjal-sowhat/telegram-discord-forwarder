@@ -13,12 +13,13 @@ import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {singleFlightFunc, sleep, timeoutFunc} from "@/prisma/utils";
 
-export async function getActionOfSource(id: string) {
+export async function getActionOfSource(botId: string, id: string) {
 	return prisma.forwardAction.findFirst({
 		where: {
 			source: {
 				channelId: id + ""
-			}
+			},
+			botId
 		},
 		include: {
 			destinations: {
