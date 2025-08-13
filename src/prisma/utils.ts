@@ -52,3 +52,13 @@ export function Throw(...args: any[]): never {
     console.error(...args);
     throw new Error(...args);
 }
+
+export async function forceTry<T extends (n: number)=>any = (n: number)=>undefined>(func: T,_sleep = 100,maxTry = 5,_try = 0): Promise<Awaited<ReturnType<T>>> {
+    try {
+        return await func(_try);
+    } catch (e) {
+        if (_try >= maxTry) throw(e);
+        await sleep(_sleep * (_try + 1));
+        return forceTry(func,_sleep,maxTry, _try + 1)
+    }
+}

@@ -1,4 +1,4 @@
-import { singleFlightFunc } from "@/prisma/utils";
+import {forceTry, singleFlightFunc} from "@/prisma/utils";
 import { getBot, isDiscordClient, isTelegramClient } from "./bot/client";
 import { ForwardChannel } from "@prisma/client";
 
@@ -76,7 +76,9 @@ async function exist(forwardChannel: AC) {
         const channel = client.channels.cache.get(forwardChannel.channelId) || await client.channels.fetch(forwardChannel.channelId).catch(() => undefined);
         return !!channel;
     } else if (isTelegramClient(client)) {
-        const chat = await client.telegram.getChat(forwardChannel.channelId).catch(()=>undefined);
+        const chat = await forceTry(()=>(
+            client.telegram.getChat(forwardChannel.channelId)
+        )).catch(()=>undefined);
         return !!chat;
     } else throw (`Unknown client type ${forwardChannel.bot.type}`)
 }

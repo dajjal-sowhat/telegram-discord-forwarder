@@ -80,6 +80,6 @@ export async function register() {
 	await Prisma.default.bot.findMany();
 	InitLogWatcher();
 	InitializeBots().catch(console.error).then(e => {
-		initializeCleaner().catch(console.error)
+		//initializeCleaner().catch(console.error)
 	})
 }

@@ -12,6 +12,7 @@ import {handleWatermark} from "./watermark";
 import CustomTelegraf from "../telegraf/CustomTelegraf";
 import {getBot, isDiscordClient, isTelegramClient} from "./bot/client";
 import {singleFlightFunc, sleep, timeoutFunc} from "@/prisma/utils";
+import {GetEvent} from "@/core/bot/event/events.handler";
 
 export async function getActionOfSource(botId: string, id: string) {
 	return prisma.forwardAction.findFirst({
@@ -82,12 +83,24 @@ export async function convertMessageToBaseObject(client: CustomTelegraf | Discor
 	}
 }
 
+const prevs: {
+	[desId: string]: string
+} = {}
 export const handleAction = async <Source extends ForwardChannel>(
 	source: Source,
 	_message: SupportedMessage,
 	destination: ForwardChannel,
 	previousResult?: ActionResult
 ) => {
+	const anyMsg = _message as any;
+	const duplicateId = _message?.content || ((anyMsg?.text ?? anyMsg?.channelPost?.caption ?? anyMsg?.update?.edited_channel_post?.text ?? anyMsg?.update?.channel_post?.text) as string) || _message.id || anyMsg?.msgId || anyMsg?.update.channel_post?.message_id || anyMsg?.channelPost?.message_id || anyMsg?.update?.edited_channel_post?.message_id || anyMsg?.update?.channel_post?.message_id
+	const prev = prevs[destination.channelId];
+	if (prev === duplicateId) {
+		console.warn(`Duplicate Detected S:${source.name} | D: ${destination.name}`);
+		return;
+	}
+	prevs[destination.channelId] = duplicateId;
+
 	const thread_type = destination.type === "TELEGRAM" ? "TELEGRAM":"DISCORD"
 	let thread = DESTINATION_THREAD[thread_type];
 	if (!thread) {
@@ -146,7 +159,7 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 	if (message.imageUrl && typeof message.imageUrl === 'string') {
 		message.imageUrl = await handleWatermark(message.imageUrl).catch(()=>message.imageUrl);
 	}
-	
+
 	if (_message instanceof Discord.Message) {
 		[
 			...Array.from(_message.mentions.channels.values()),
@@ -170,8 +183,6 @@ const DIRECT_handleAction = async <Source extends ForwardChannel>(
 		}
 	}
 	removeInvalidMentions();
-
-	console.log(`[${sourceBot.name}/${sourceBot.type}] forward ${source.name} => ${destination.name}...`,previousResult);
 
 	if (destination.type === "TELEGRAM") {
 		if (!isTelegramClient(destinationClient)) throw("Client should be telegram client!");

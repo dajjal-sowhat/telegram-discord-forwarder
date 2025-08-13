@@ -55,7 +55,6 @@ export class TelegramEventHandler extends ClientEventHandler<CustomTelegraf> {
 
 		await Promise.all(action.destinations.map(async ({ destination }) => {
 			const R = await handleAction(action.source, e, destination).catch(console.error);
-
 			if (!R) {
 				console.error(`${action.source.name} => ${destination.name} action error`);
 				return;
