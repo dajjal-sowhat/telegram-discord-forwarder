@@ -4,7 +4,7 @@ import Discord, { ActivityType, ClientOptions } from "discord.js";
 import CustomTelegraf from "../../telegraf/CustomTelegraf";
 import { handleClientEvent } from "./events";
 import { PrismaModelType } from "@/prisma/PrismaClient";
-import {singleFlightFunc, sleep, Throw, timeoutFunc} from "@/prisma/utils";
+import { singleFlightFunc, sleep, Throw, timeoutFunc } from "@/prisma/utils";
 
 declare global {
     var INITIALIZED_CLIENTS: {
@@ -76,7 +76,7 @@ declare module "discord.js" {
     }
 }
 
-export const getBot = singleFlightFunc(async function(_bot: string | PrismaModelType<'bot'>, type?: BotType) {
+export const getBot = singleFlightFunc(async function (_bot: string | PrismaModelType<'bot'>, type?: BotType) {
     const bot = typeof _bot === 'string' ? await prisma.bot.findUnique({
         where: {
             id: _bot.split("|").at(-1),
@@ -93,7 +93,24 @@ export const getBot = singleFlightFunc(async function(_bot: string | PrismaModel
 })
 
 export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: PrismaModelType<'bot'>, _try = 0) {
-    if (_try > 5) throw (`looks like the client ${bot.name}(${bot.key}) unavailable!`);
+    bot = await prisma.bot.findUnique({
+        where: {
+            id: bot.id
+        }
+    }) || bot;
+    if (_try >= 5) {
+        await prisma.bot.update({
+            where: {
+                id: bot.id
+            },
+            data: {
+                stopped: true,
+                status: "InvalidToken"
+            }
+        })
+        throw (`looks like the client ${bot.name}(${bot.key}) unavailable!`);
+    }
+    if (bot.stopped) throw (`${bot.name} STOPPED/${bot.status}`);
 
     const types: BotType[] = ['DISCORD', "SELF_DISCORD"];
     if (!types.includes(bot.type)) throw (`Supported type for discord client is ${types}, ${bot.type} doesn't supported`);
@@ -103,7 +120,7 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
     let client = INITIALIZED_CLIENTS[key] as Discord.Client;
 
     if (!client) {
-        if (global.DiscordRateLimit) throw("Discord login not available during rate limit");
+        if (global.DiscordRateLimit) throw ("Discord login not available during rate limit");
         console.log(`Initializing ${bot.type} ${bot.name}...`)
         client = new Discord.Client(getDiscordClientOptions(bot.type as "DISCORD"));
         client.bot = {
@@ -133,7 +150,8 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
                 id: bot.id
             },
             data: {
-                stopped: false
+                stopped: false,
+                status: "StandBy"
             }
         })
     }
@@ -145,14 +163,28 @@ export const getDiscordBot = singleFlightFunc(async function getDiscordBot(bot: 
 
 export const getTelegramBot = singleFlightFunc(async function getTelBot(bot: PrismaModelType<'bot'>) {
     if (bot.type !== 'TELEGRAM') throw (`Unknown telegram bot ${bot.type}/${bot.id}`);
+    if (bot.stopped) throw (`${bot.name} STOPPED/${bot.status}`);
 
     const key = `${bot.type}|${bot.id}` as const;
 
-    let client = INITIALIZED_CLIENTS[key];
+    let client = INITIALIZED_CLIENTS[key] as CustomTelegraf;
 
     if (!client) {
         console.log(`Initializing telegram bot ${bot.name}...`)
         client = new CustomTelegraf(bot, bot.token);
+        client.onDisconnect(async () => {
+            const test = client.telegram.getMe().catch(() => undefined);
+            if (!!test) return;
+            await prisma.bot.update({
+                where: {
+                    id: bot.id
+                },
+                data: {
+                    stopped: true,
+                    status: "InvalidToken"
+                }
+            })
+        })
         await client.waitToReady();
         INITIALIZED_CLIENTS[key] = client;
         handleClientEvent(bot, client);
@@ -163,7 +195,8 @@ export const getTelegramBot = singleFlightFunc(async function getTelBot(bot: Pri
                 id: bot.id
             },
             data: {
-                stopped: false
+                stopped: false,
+                status: "StandBy"
             }
         })
     }
@@ -231,7 +264,7 @@ async function RateLimit(this: { loading: boolean }) {
 
     this.loading = false;
 }
-const RateLimitTh = RateLimit.bind({loading: false});
+const RateLimitTh = RateLimit.bind({ loading: false });
 RateLimitTh().catch(console.error);
 global.DiscordRateLimitThread = setInterval(RateLimitTh, 10000)
 
@@ -295,7 +328,8 @@ export async function terminateClient(bot: PrismaModelType<'bot'>) {
             id: bot.id
         },
         data: {
-            stopped: true
+            stopped: true,
+            status: "Terminated"
         }
     })
     delete global.INITIALIZED_CLIENTS[bot.key];

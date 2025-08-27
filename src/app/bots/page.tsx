@@ -1,7 +1,7 @@
-import {Button, Table} from "@mantine/core";
-import {getBot, isDiscordClient, terminateClient} from "@/core/bot/client";
-import {revalidatePath} from "next/cache";
-import {ssr} from "@/prisma/utils";
+import { Button, Table } from "@mantine/core";
+import { getBot, isDiscordClient, terminateClient } from "@/core/bot/client";
+import { revalidatePath } from "next/cache";
+import { ssr } from "@/prisma/utils";
 import Refresher from "@/app/bots/Refresher";
 import AddBotComponent from "@/app/bots/AddBotComponent";
 import Link from "next/link";
@@ -18,12 +18,12 @@ async function Page(props: any) {
                 <summary>
                     Add Bot
                 </summary>
-                <AddBotComponent/>
+                <AddBotComponent />
             </details>
-            <Refresher/>
+            <Refresher />
             <Table
                 data={{
-                    head: ['id', 'type', 'name', 'ready', "action"],
+                    head: ['id', 'type', 'name', 'ready', "status", "action"],
                     body: ssr(bots).map(bot => {
                         const client = INITIALIZED_CLIENTS[bot.key];
                         const isReady = client ? isDiscordClient(client) ? client.isReady() : client.ready : false;
@@ -32,6 +32,7 @@ async function Page(props: any) {
                             bot.type,
                             bot.name,
                             !client ? "Stopped" : isReady ? "Ready" : "Waiting",
+                            bot.status,
                             <div className={'flex gap-2 justify-start items-center'}>
                                 <Link href={`/bots/${bot.id}`}>
                                     <Button>
@@ -42,15 +43,16 @@ async function Page(props: any) {
                                     'use server';
 
                                     if (!isReady) {
-                                        await prisma.bot.update({
+                                        let _bot = await prisma.bot.update({
                                             where: {
                                                 id: bot.id
                                             },
                                             data: {
-                                                stopped: false
+                                                stopped: false,
+                                                status: "Starting"
                                             }
                                         })
-                                        await getBot(bot);
+                                        await getBot(_bot);
                                     } else {
                                         await terminateClient(bot);
                                     }

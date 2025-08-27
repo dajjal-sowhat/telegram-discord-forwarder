@@ -12,6 +12,7 @@ model Bot {
   token              String                     @unique
   name               String
   type               BotType
+  status             String                     @default("-")
   stopped            Boolean                    @default(false)
   created_at         DateTime                   @default(now())
   channels           ForwardChannel[]

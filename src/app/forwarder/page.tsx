@@ -62,7 +62,8 @@ export async function getForwards(skip = 0, take = 10) {
 	}))).then(e=>e.flat());
 
 	const categories = await Promise.all(discordCategories.map(async ({bot,categories}) => {
-		const discordBot = await getDiscordBot(bot);
+		const discordBot = await getDiscordBot(bot).catch(()=>undefined);
+		if (!discordBot) return [];
 		return categories.map(cat => ({
 			id: cat.id,
 			source: {

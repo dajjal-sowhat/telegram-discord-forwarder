@@ -79,7 +79,8 @@ export async function handleForwardRegister(sourceBot: PrismaModelType<'bot'>, d
 }
 
 export async function getDiscordCategories(bot: PrismaModelType<'bot'>) {
-	const discordBot = await getDiscordBot(bot);
+	const discordBot = await getDiscordBot(bot).catch(()=>undefined);
+	if (!discordBot) return [];
 	return Array.from(discordBot.channels.cache.filter(o => o.type === ChannelType.GuildCategory).values()).map(ch => ({
 		name: ch.name + `[${ch.guild.name}]`,
 		id: ch.id,
