@@ -49,12 +49,21 @@ async function Page(props: any) {
                                             },
                                             data: {
                                                 stopped: false,
-                                                status: "Starting"
+                                                status: "init"
                                             }
                                         })
                                         await getBot(_bot);
                                     } else {
-                                        await terminateClient(bot);
+                                        let _bot = await prisma.bot.update({
+                                            where: {
+                                                id: bot.id
+                                            },
+                                            data: {
+                                                stopped: false,
+                                                status: "ManualExit"
+                                            }
+                                        })
+                                        await terminateClient(_bot);
                                     }
                                     revalidatePath("./")
                                 }}>

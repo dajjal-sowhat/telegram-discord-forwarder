@@ -329,7 +329,7 @@ export async function terminateClient(bot: PrismaModelType<'bot'>) {
         },
         data: {
             stopped: true,
-            status: "Terminated"
+            status: `${bot.status} (EXIT)`
         }
     })
     delete global.INITIALIZED_CLIENTS[bot.key];

@@ -48,7 +48,8 @@ global.SelfBotRestart ||= setInterval(async function () {
 				{
 					type: "DISCORD"
 				},
-			]
+			],
+			stopped: false
 		}
 	});
 
