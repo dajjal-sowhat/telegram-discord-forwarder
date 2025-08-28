@@ -57,7 +57,16 @@ global.SelfBotRestart ||= setInterval(async function () {
 		do {
 			try {
 				console.log(`Stopping ${bot.name}...`);
-				await terminateClient(bot).catch(console.error);
+				await terminateClient(bot, "Restart").catch(console.error);
+				await prisma.bot.update({
+					where: {
+						id: bot.id
+					},
+					data: {
+						status: "Starting",
+						stopped: false
+					}
+				})
 				console.log(`Starting ${bot.name}...`);
 				await getDiscordBot(bot);
 				break;

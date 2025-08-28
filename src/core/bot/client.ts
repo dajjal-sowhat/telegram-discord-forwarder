@@ -308,7 +308,7 @@ export function getDiscordClientOptions(type: "DISCORD" | "SELF_DISCORD"): Clien
     }
 }
 
-export async function terminateClient(bot: PrismaModelType<'bot'>) {
+export async function terminateClient(bot: PrismaModelType<'bot'>,status = bot.status) {
     const client = await getBot(bot);
     if (!client) return;
 
@@ -329,7 +329,7 @@ export async function terminateClient(bot: PrismaModelType<'bot'>) {
         },
         data: {
             stopped: true,
-            status: `${bot.status} (EXIT)`
+            status: `${status} (EXIT)`
         }
     })
     delete global.INITIALIZED_CLIENTS[bot.key];
